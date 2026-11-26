@@ -11,6 +11,8 @@ SYNC_DIR = storage.ROOT / 'sync'
 SNAPSHOT = SYNC_DIR / 'snapshot.json'
 MAX_SIZE = 20 * 1024 * 1024
 PLAYER_FIELDS = ('id', 'name', 'season', 'ovr', 'position', 'club', 'height_cm', 'weight_kg', 'weak_foot', 'attributes', 'attributes_note', 'traits', 'description', 'source_url', 'fetched_at', 'data_note')
+OPTIONAL_PLAYER_FIELDS = ('salary', 'preferred_foot', 'left_foot', 'right_foot', 'trait_details', 'profile', 'club_career')
+PROFILE_FIELDS = ('birthdate', 'age', 'number', 'nation_name', 'league_name', 'bodytype_name', 'skill_level', 'workrate_att', 'workrate_def', 'reputation')
 SQUAD_FIELDS = ('name', 'formation', 'mode', 'notes')
 SLOT_FIELDS = ('key', 'position', 'name', 'season', 'level', 'player_id')
 
@@ -39,7 +41,7 @@ def data_from(connection):
     squad = json.loads(row[0]) if row else storage.default_squad()
     players = [json.loads(row[0]) for row in connection.execute('SELECT data FROM players ORDER BY id')]
     squad = {key: squad.get(key, '') for key in SQUAD_FIELDS} | {'slots': [{key: slot[key] for key in SLOT_FIELDS if key in slot} for slot in squad['slots']]}
-    players = [{key: player[key] for key in PLAYER_FIELDS if key in player} for player in players]
+    players = [{key: player[key] for key in PLAYER_FIELDS + OPTIONAL_PLAYER_FIELDS if key in player} for player in players]
     return {'version': 1, 'squad': squad, 'players': players}
 
 
@@ -67,7 +69,7 @@ def validate(snapshot):
         raise ValueError('同步文件中的球员数据无效。')
     identifiers = set()
     for player in players:
-        if not isinstance(player, dict) or set(player) != set(PLAYER_FIELDS):
+        if not isinstance(player, dict) or not set(PLAYER_FIELDS).issubset(player) or not set(player).issubset(PLAYER_FIELDS + OPTIONAL_PLAYER_FIELDS):
             raise ValueError('同步文件中的球员字段无效。')
         identifier = player['id']
         if not isinstance(identifier, str) or not re.fullmatch(r'[a-z0-9]{5,20}', identifier) or identifier in identifiers:
@@ -82,14 +84,36 @@ def validate(snapshot):
             raise ValueError('同步文件中的球员名称或赛季为空。')
         if type(player['ovr']) is not int or not 0 <= player['ovr'] <= 1000:
             raise ValueError('同步文件中的球员总评无效。')
-        for field in ('height_cm', 'weight_kg', 'weak_foot'):
-            if player[field] is not None and (type(player[field]) is not int or not 0 <= player[field] <= 1000):
+        for field in ('height_cm', 'weight_kg', 'weak_foot', 'salary'):
+            value = player.get(field)
+            if value is not None and (type(value) is not int or not 0 <= value <= 1000):
                 raise ValueError('同步文件中的球员数值无效。')
+        if player.get('preferred_foot') not in (None, 'left', 'right'):
+            raise ValueError('同步文件中的惯用脚无效。')
+        for field in ('left_foot', 'right_foot'):
+            value = player.get(field)
+            if value is not None and (type(value) is not int or not 1 <= value <= 5):
+                raise ValueError('同步文件中的左右脚数值无效。')
         attributes, traits = player['attributes'], player['traits']
         if not isinstance(attributes, dict) or len(attributes) > 200 or any(not isinstance(key, str) or len(key) > 100 or type(value) is not int or not 0 <= value <= 1000 for key, value in attributes.items()):
             raise ValueError('同步文件中的球员属性无效。')
         if not isinstance(traits, list) or len(traits) > 200 or any(not isinstance(value, str) or len(value) > 200 for value in traits):
             raise ValueError('同步文件中的球员特性无效。')
+        profile = player.get('profile', {})
+        if not isinstance(profile, dict) or not set(profile).issubset(PROFILE_FIELDS) or any(not isinstance(value, str) or len(value) > 200 for value in profile.values()):
+            raise ValueError('同步文件中的球员基本资料无效。')
+        details = player.get('trait_details', [])
+        if not isinstance(details, list) or len(details) > 200:
+            raise ValueError('同步文件中的特殊能力详情无效。')
+        for item in details:
+            if not isinstance(item, dict) or set(item) != {'id', 'name', 'effect'} or not isinstance(item['id'], str) or not re.fullmatch(r'\d{1,6}', item['id']) or not isinstance(item['name'], str) or not item['name'] or len(item['name']) > 200 or not isinstance(item['effect'], str) or len(item['effect']) > 2000:
+                raise ValueError('同步文件中的特殊能力详情无效。')
+        career = player.get('club_career', [])
+        if not isinstance(career, list) or len(career) > 200:
+            raise ValueError('同步文件中的俱乐部经历无效。')
+        for item in career:
+            if not isinstance(item, dict) or set(item) != {'year', 'team', 'loan'} or not isinstance(item['year'], str) or len(item['year']) > 100 or not isinstance(item['team'], str) or len(item['team']) > 200 or type(item['loan']) is not bool:
+                raise ValueError('同步文件中的俱乐部经历无效。')
     squad = snapshot['squad']
     if not isinstance(squad, dict) or set(squad) != set(SQUAD_FIELDS) | {'slots'} or not isinstance(squad.get('slots'), list):
         raise ValueError('同步文件中的阵容格式无效。')

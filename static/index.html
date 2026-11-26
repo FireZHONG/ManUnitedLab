@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#101614">
   <title>红魔战术室 · FC Online 阵容助手</title>
   <link rel="stylesheet" href="/styles.css">
@@ -49,6 +50,7 @@
         <section class="lower-grid">
           <div class="panel library-card" id="library"><div class="section-kicker">PLAYER DATABASE <span>03</span></div><div class="section-title"><div><h2>球员资料</h2><p>按需导入，保留来源和更新时间。</p></div><span class="section-number">01 — 02</span></div>
             <div class="source-note"><span>i</span><p>FIFA Addict 是独立球迷站。中文页面不代表国服官方数据，卡片上架与价格请以游戏内为准。</p></div>
+            <form id="online-search-form"><label for="online-search">在线搜索 FIFA Addict 球员</label><div class="input-action"><input id="online-search" type="search" placeholder="输入球员名称" required><button class="button dark" type="submit">搜索 <span>↗</span></button></div><p class="helper">搜索词将发送至 FIFA Addict。头像、赛季、左右脚及特殊能力图标由浏览器向 FIFA Addict 图片服务器加载；结果仅供参考，选择卡片后可导入详情。</p></form><div id="online-search-status" class="online-search-status" role="status" aria-live="polite"></div><div id="online-search-results" class="player-list"></div>
             <form id="player-form"><label for="player-url">导入球员详情链接</label><div class="input-action"><input id="player-url" type="url" placeholder="https://cn.fifaaddict.com/fo4db/pid..." required><button class="button dark" type="submit">导入 / 刷新 <span>↗</span></button></div></form>
             <div class="library-tools"><div><strong>本地球员库</strong><small>搜索已导入的球员</small></div><a href="https://cn.fifaaddict.com/fo4db" target="_blank" rel="noopener noreferrer">前往 FIFA Addict 查找 ↗</a></div><input id="search" placeholder="搜索球员、赛季或位置" aria-label="搜索本地球员库"><div class="player-list" id="player-list"></div><div class="empty-state" id="players-empty">还没有导入球员。前往球员网站复制详情链接，粘贴到上方。</div>
           </div>
@@ -62,6 +64,7 @@
       </div>
     </main>
   </div>
+  <dialog id="player-detail-dialog" aria-labelledby="player-detail-title"><div class="dialog-head"><div><div class="section-kicker">PLAYER DETAILS</div><h2 id="player-detail-title">球员详情</h2></div><button class="close-button" id="player-detail-close" type="button" aria-label="关闭">×</button></div><div id="player-detail-content" aria-live="polite"></div></dialog>
   <dialog id="upload-dialog"><div class="dialog-head"><div><div class="section-kicker">IMPORT SQUAD</div><h2>导入阵容截图</h2></div><button class="close-button" id="upload-close" aria-label="关闭">×</button></div><p id="vision-privacy">可选择本地图片或截取桌面。截图只在点击发送后传给当前选定的模型服务，识别结果需要逐项确认。</p><button class="button dark full" id="capture-screen" type="button">截取桌面或游戏窗口 <span>↗</span></button><p class="capture-hint">浏览器会让你选择屏幕或窗口；截图后立即停止共享。全屏游戏无法捕获时，可尝试窗口或无边框模式。</p><div class="capture-preview" id="capture-preview" hidden><div class="capture-preview-head"><strong>截图预览</strong><button type="button" id="reset-crop">使用完整截图</button></div><p>在图片上拖动选择要识别的区域；未选择时使用完整截图。</p><canvas id="capture-canvas" aria-label="桌面截图预览，可用鼠标或触屏拖动选择识别区域"></canvas><small id="crop-status">当前使用完整截图</small></div><label class="upload-box" for="image-input"><span>↑</span><strong>或选择一张本地截图</strong><small>PNG / JPG / WEBP，最大 4 MB</small></label><input id="image-input" type="file" accept="image/png,image/jpeg,image/webp"><div id="image-name"></div><button class="button primary full" id="recognize" type="button">发送截图并识别 <span>↗</span></button><div id="recognition-results"></div><p class="dialog-foot">不支持视觉的模型无法识别截图，你仍可手动填写阵容。</p></dialog>
   <dialog id="settings-dialog">
     <div class="dialog-head"><div><div class="section-kicker">LOCAL SETTINGS</div><h2>设置与手动同步</h2></div><button class="close-button" id="settings-close" type="button" aria-label="关闭">×</button></div>

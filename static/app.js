@@ -3,6 +3,209 @@ const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const coordinates = { LW: [17, 19], ST: [50, 12], RW: [83, 19], LCM: [31, 38], RCM: [69, 38], CDM: [50, 55], LB: [13, 72], LCB: [38, 75], RCB: [62, 75], RB: [87, 72], GK: [50, 91] };
 let toastTimer;
+const seasonBadgeData = `
+ICONTM|ICON THE MOMENT|0
+ICONTMB|ICON THE MOMENT B|8
+ICON|ICON|1
+DR|Derby Rivals|204
+26UP|26 Undroppable Player|201
+UC|Untouchable Champions|200
+SPT|Spartan|190
+PTG|Path to Glory|186
+WG|Warriors of Glory|184
+FAC|Football Association Champions|175
+25DP|25 Devoted Player|174
+26FSL|26 FCO Super Champions League|191
+FSL|25 FCO Super Champions League|173
+WS|Winning Streak|171
+DCB|Dramatic Comebacks|169
+CH|Continental Heroes|168
+LE|Legend of Europa|163
+NO7|NO.7 LEGENDS (Server: th,vn,cn)|166
+NO7KR|NO.7 LEGENDS (Server: kr)|162
+WB|Wonderboys|159
+GRU|Greatest Runner-Ups|152
+BLD|Best Legend|151
+BDO|Ballon d'Or|150
+EEP|EVO-Energetic Player|207
+24EP|Energetic Player 2024|149
+ECU|EVO-Champions of Europe|208
+CU|Champions of Europe|148
+MDL|Medalist|146
+EU24|UEFA EURO 2024|140
+LD|Last Dance|143
+UT|Unexpected Transfer|139
+JNM|Journeyman|138
+DC|Decades|129
+FC|FC Ambassador|88
+23HW|23 Hard Worker|89
+CC|Century Club|87
+HG|Home Grown|82
+RTN|Returnees|83
+BWC|Best of World Cup|72
+WC22|World Cup 2022|73
+26TY|Team Of The Year 2026|177
+26TYN|Team Of The Year 2026 Nominate|178
+25TY|Team Of The Year 2025|154
+25TYN|Team Of The Year 2025 Nominate|155
+24TY|Team Of The Year 2024|133
+24TYN|Team Of The Year 2024 Nominate|134
+23TY|Team Of The Year 2023|78
+23TYN|Team Of The Year 2023 Nominate|79
+22TY|Team Of The Year 2022|60
+22TYN|Team Of The Year 2022 Nominate|61
+21TY|Team Of The Year 2021|43
+21TYN|Team Of The Year 2021 Nominate|44
+20TY|Team Of The Year 2020|28
+20TYN|Team Of The Year 2020 Nominate|30
+19TY|Team Of The Year 2019|20
+18TY|Team Of The Year 2018|15
+26TS|Team Of The Season 2026|189
+25TS|Team Of The Season 2025|167
+24TS|Team Of The Season 2024|145
+23TS|Team Of The Season 2023|86
+22TS|Team Of The Season 2022|68
+21TS|Team Of The Season 2021|52
+20TS|Team Of The Season 2020|35
+19TS|Team Of The Season 2019|23
+NHD|National Hero Debut|13
+TB|Tournament Best|16
+TT|Top Transfer|17
+GR|Golden Rookies|19
+TC|Tournament Champions|22
+HOT|Heroes of the Team|24
+SPL|Spotlight|70
+LN|Legendary Numbers|69
+LOL|Legend of the Loan|66
+FA|Free Agent|65
+OTW|Ones Time Watch|26
+BOE21|Best of Europe 21|55
+BOE|Best of Europe 20|34
+BTB|Back to Back|58
+CAP|Captain|54
+EBS|European Best Stars|53
+UP|Unsung Player|48
+MC|Multi-League Champions|40
+VTR|Veteran|36
+MOG|Moments of Glory|37
+LH|Loyal Heroes|31
+COC|Competitors of Continents|25
+26HR|26 Heroes|181
+25HR|25 Heroes|158
+24HR|24 Heroes|137
+23HR|23 Heroes|81
+22HR|22 Heroes|63
+23NG|2023 New Generation|130
+22NG|2022 New Generation|76
+21NG|2021 New Generation|64
+20NG|2020 New Generation|41
+19NG|2019 New Generation|27
+25UCL|25-26 UEFA Champions League|179
+24UCL|24-25 UEFA Champions League|157
+23UCL|23-24 UEFA Champions League|136
+22UCL|22-23 UEFA Champions League|80
+21UCL|21-22 UEFA Champions League|62
+20UCL|20-21 UEFA Champions League|45
+19UCL|19–20 UEFA Champions League|29
+26PL|26 Premium Live|123
+25PL|25-26 Premium Live|121
+24PL|24-25 Premium Live|119
+23PL|23-24 Premium Live|117
+22PL|22-23 Premium Live|115
+21PL|21-22 Premium Live|113
+20A|20-21 PLC Autumn|111
+19S|19-20 PLC Spring|109
+19A|19-20 PLC Autumn|108
+18S|18-19 PLC Spring|107
+18A|18-19 PLC Autumn|106
+LIVE|2025 LIVE|96
+25|25 Live|105
+24|2024|104
+23|2023|103
+22|2022|102
+21|2021|101
+20|2020|100
+19|2019|99
+18|2018|98
+17|2017|97
+25IM|25 ICONS MATCH - Show & Prove|11
+25IMF|25 ICONS MATCH - Fan Boost|12
+ICONM|ICONS MATCH|9
+NTG|Nostalgia|46
+JA|Juventus Ambassador|128
+RMFC|Real Madrid CF Ambassadors|74
+CFA|Chelsea FC Ambassador|56
+LA|Liverpool Ambassador|39
+PSG|Paris Saint Germain|93
+MCI|Man City ICON|21
+MCC|17-18 Man City Champions|94
+VLA|Volta Live Ambassador|38
+26TH|26 Thai Best|199
+25TH|25 Thai Best|170
+THB|Thai Best|147
+THL|Thai Legends|33
+26LM|26 Legends Match VN|195
+26VB|26 VN Best|193
+25VB|25 Vietnam Best|160
+24VB|24 Vietnam Best|142
+23VB|23 Vietnam Best|85
+22VB|22 Vietnam Best|57
+VFG|Vietnam Future Generation|75
+VNL|Vietnam Legends|50
+VN|Viet Nam|18
+PRM|Prime|161
+IPRM|Infinite Prime|188
+HC|Heroes Cartoon|172
+TK|TEAM KOREA|187
+KHD|Korea Heroes Debut|185
+TKI|Team Korea Icons|14
+TKL|Team K League|32
+12KH|2012 KH|49
+26KL|26 K League|122
+25KL|25 KLeague|120
+24KL|24 KLeague|118
+23KL|23 KLeague|116
+22KL|22 KLeague|114
+21KL|21 KLeague|112
+20KL|20 KLeague|110
+26KB|26 K League Best|205
+25KLB|25 K-League Best|176
+24KLB|24 K-League Best|153
+23KLB|23 K-League Best|131
+22KLB|22 K-League Best|77
+21KLB|21 K-League Best|59
+20KLB|20 K-League Best|42
+K23|Korea Football Association 2023|132
+K22|Korea Football Association 2022|90
+K21|Korea Football Association 2021|91
+K19|Korea Football Association 2019|92
+K18|Korea Football Association 2018|95
+22TG|22 Totem Legendary|71
+21TG|21 Totem Legendary|47
+24WL|2024 World Legends|7
+23WL|2023 World Legends|6
+22WL|2022 World Legends|5
+21WL|2021 World Legends|4
+20WL|2020 World Legends|3
+19WL|2019 World Legends|2
+SYL|Snake Year Limitation|156
+DYL|Dragon Year Limitation|141
+RYL|Rabbit Year Limitation|84
+TYL|Tiger Year Limitation|67
+MLS|Mythical Legend|144
+TKC|Three Kingdoms Legend|135
+26CSL|2026 Chinese Super League|203
+25CSL|2025 Chinese Super League|165
+FLG|Legendary Glory|164
+26FCL|26 FC Online League|192
+EL|Eternal Legends|10
+HYL1|Horse Year Legend: Success Arrives Swiftly|180
+HYL2|Horse Year Legend: Leading the Charge|182
+HYL3|Horse Year Legend: Spurring Forward at Full Speed|183
+CTR|Captain Tsubasa: Rising Young Champions|194
+CTT|Captain Tsubasa: Tiger Wing Showdown|197
+CTK|Captain Tsubasa: Kickoff on the Green|198`.trim().split('\n').map((line) => line.split('|'));
+const seasonBadges = new Map(seasonBadgeData.flatMap(([short, name, index]) => [[short.toLowerCase(), Number(index)], [name.toLowerCase(), Number(index)]]));
 
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
@@ -25,6 +228,99 @@ function shortName(name) {
   const parts = name.trim().split(/\s+/);
   return parts.length > 1 ? parts[parts.length - 1] : name;
 }
+function playerPortrait(player, eager = false) {
+  const portrait = document.createElement('div');
+  portrait.className = 'player-portrait';
+  const fallback = document.createElement('span');
+  fallback.textContent = (player.name || '?').charAt(0).toUpperCase();
+  portrait.append(fallback);
+  if (typeof player.id === 'string' && /^[a-z0-9]{5,20}$/.test(player.id)) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.loading = eager ? 'eager' : 'lazy';
+    image.referrerPolicy = 'no-referrer';
+    image.addEventListener('load', () => fallback.hidden = true);
+    image.addEventListener('error', () => image.remove());
+    image.src = `https://s1.fifaaddict.com/fo4/players/${player.id}.png`;
+    portrait.append(image);
+  }
+  return portrait;
+}
+function seasonBadge(season) {
+  const index = seasonBadges.get(String(season || '').trim().toLowerCase());
+  const badge = document.createElement('span');
+  badge.className = 'season-icon';
+  if (index === undefined) return badge;
+  const image = document.createElement('img');
+  image.alt = '';
+  image.referrerPolicy = 'no-referrer';
+  image.style.left = `${-(index % 18) * 20}px`;
+  image.style.top = `${-Math.floor(index / 18) * 16}px`;
+  image.addEventListener('load', () => badge.classList.add('loaded'));
+  image.addEventListener('error', () => badge.remove());
+  image.src = 'https://fifaaddict.com/ffaddv2/img/b447c38.png';
+  badge.append(image);
+  return badge;
+}
+function playerPosition(position) {
+  const value = String(position || '').trim();
+  const normalized = value.toUpperCase();
+  const groups = {
+    forward: ['ST', 'LS', 'RS', 'CF', 'LF', 'RF', 'LW', 'RW', '前锋', '中锋', '影锋', '左边锋', '右边锋'],
+    midfield: ['CAM', 'LAM', 'RAM', 'CM', 'LCM', 'RCM', 'CDM', 'LDM', 'RDM', 'LM', 'RM', '前腰', '中场', '中前卫', '后腰', '左前卫', '右前卫'],
+    defense: ['CB', 'LCB', 'RCB', 'LB', 'RB', 'LWB', 'RWB', 'SW', '后卫', '中后卫', '左后卫', '右后卫', '左边后卫', '右边后卫', '清道夫'],
+    goalkeeper: ['GK', '门将', '守门员'],
+  };
+  const group = Object.keys(groups).find((key) => groups[key].includes(normalized)) || 'unknown';
+  return `<div class="player-list-position position-${group}" title="位置：${escapeHtml(value || '未知')}">${escapeHtml(value || '—')}</div>`;
+}
+function footLabel(player) { return { left: '左脚', right: '右脚' }[player.preferred_foot] || '未知'; }
+let footSpriteProbe;
+function playerMetrics(player) {
+  if (!footSpriteProbe) {
+    footSpriteProbe = new Image();
+    footSpriteProbe.referrerPolicy = 'no-referrer';
+    footSpriteProbe.addEventListener('load', () => document.documentElement.classList.add('foot-sprite-loaded'));
+    footSpriteProbe.src = 'https://fifaaddict.com/ffaddv2/img/4364840.png';
+  }
+  const left = player.left_foot ?? '—';
+  const right = player.right_foot ?? '—';
+  const salary = player.salary ?? '—';
+  const ovr = player.ovr ?? '—';
+  const footDescription = `左脚 ${left}，右脚 ${right}，惯用脚 ${footLabel(player)}`;
+  return `<div class="player-metrics"><div class="foot-pair" role="img" aria-label="${escapeHtml(footDescription)}" title="${escapeHtml(footDescription)}"><span class="foot-value ${player.preferred_foot === 'left' ? 'preferred' : ''}" aria-hidden="true">${escapeHtml(left)}</span><span class="foot-value ${player.preferred_foot === 'right' ? 'preferred' : ''}" aria-hidden="true">${escapeHtml(right)}</span></div><span class="salary-badge" aria-label="工资 ${escapeHtml(salary)}" title="工资 ${escapeHtml(salary)}">${escapeHtml(salary)}</span><span class="player-rating" aria-label="总评 ${escapeHtml(ovr)}" title="总评 ${escapeHtml(ovr)}">${escapeHtml(ovr)}</span></div>`;
+}
+let detailRequest = 0;
+function renderPlayerDetail(player, status) {
+  const content = $('#player-detail-content');
+  const attributes = Object.entries(player.attributes || {});
+  const traits = Array.isArray(player.trait_details) ? player.trait_details : (player.traits || []).map((name) => ({ name }));
+  const profile = player.profile || {};
+  const career = Array.isArray(player.club_career) ? player.club_career : [];
+  const fetched = player.fetched_at ? new Date(player.fetched_at).toLocaleString('zh-CN') : '尚未获取';
+  const workrate = (value) => ({ low: '低', mid: '中', high: '高' }[value] || value || '未知');
+  const fields = [['赛季', player.season || '未知'], ['位置', player.position || '未知'], ['总评 OVR', player.ovr ?? '未知'], ['工资', player.salary ?? '未知'], ['惯用脚', footLabel(player)], ['逆足', player.weak_foot ?? '未知'], ['身高', player.height_cm == null ? '未知' : `${player.height_cm} cm`], ['体重', player.weight_kg == null ? '未知' : `${player.weight_kg} kg`], ['体型', profile.bodytype_name || '未知'], ['俱乐部', player.club || '未知'], ['国籍', profile.nation_name || '未知'], ['联赛', profile.league_name || '未知'], ['出生日期', profile.birthdate || '未知'], ['年龄', profile.age || '未知'], ['球衣号码', profile.number ?? '未知'], ['花式动作', profile.skill_level ? `${profile.skill_level} 星` : '未知'], ['进攻 / 防守倾向', `${workrate(profile.workrate_att)} / ${workrate(profile.workrate_def)}`], ['名声', profile.reputation || '未知']];
+  const traitHtml = traits.length ? traits.map((trait) => `<div class="detail-trait">${/^\d{1,6}$/.test(trait.id || '') ? `<img loading="lazy" src="https://s1.fifaaddict.com/fo4/traits/trait_icon_${trait.id}.png" alt="">` : ''}<div><strong>${escapeHtml(trait.name)}</strong><p>${escapeHtml(trait.effect || '效果暂未获取')}</p></div></div>`).join('') : '<p>暂无特殊能力数据</p>';
+  const careerHtml = career.length ? career.map((item) => `<div class="detail-career-row"><span>${escapeHtml(item.year)}</span><strong>${escapeHtml(item.team)}${item.loan ? '（租借）' : ''}</strong></div>`).join('') : `<p>${player.club_career ? '数据源暂无俱乐部经历' : '尚未获取，请刷新球员资料'}</p>`;
+  content.innerHTML = `<div class="detail-heading"><div class="detail-portrait"></div><div><h3>${escapeHtml(player.name)}</h3><p>${escapeHtml(player.season || '未知赛季')} · ${escapeHtml(player.position || '位置未知')}</p></div></div><p class="detail-status">${escapeHtml(status)}</p><div class="detail-grid">${fields.map(([label, value]) => `<div><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></div>`).join('')}</div><section class="detail-section"><h3>${player.profile ? '全部基础能力值' : '已获取的能力值'}</h3><div class="detail-attributes">${attributes.length ? attributes.map(([name, value]) => `<div><span>${escapeHtml(name)}</span><strong>${escapeHtml(value)}</strong></div>`).join('') : '<p>暂无数据</p>'}</div><small>${escapeHtml(player.attributes_note || '详情仅显示数据源已提供的部分属性。')}</small></section><section class="detail-section"><h3>特殊能力</h3><div class="detail-traits">${traitHtml}</div></section><section class="detail-section"><h3>INFO</h3><p>${escapeHtml(player.description || '暂无资料')}</p></section><section class="detail-section"><h3>俱乐部经历</h3>${careerHtml}</section><p class="detail-source">${escapeHtml(player.data_note || '第三方数据，不代表国服官方实时数据。')}<br>获取时间：${escapeHtml(fetched)} · <a href="https://cn.fifaaddict.com/fo4db/pid${escapeHtml(player.id)}" target="_blank" rel="noopener noreferrer">查看来源 ↗</a></p>`;
+  content.querySelector('.detail-portrait').append(playerPortrait(player, true));
+}
+async function openPlayerDetail(player, local) {
+  const request = ++detailRequest;
+  const dialog = $('#player-detail-dialog');
+  const needsFetch = !local || player.salary == null || !player.preferred_foot || !player.profile || !Array.isArray(player.trait_details) || !Array.isArray(player.club_career);
+  renderPlayerDetail(player, needsFetch ? '正在获取 FIFA Addict 详情…' : '显示本地缓存；可通过球员列表中的“刷新”更新。');
+  if (!dialog.open) dialog.showModal();
+  if (!needsFetch) return;
+  try {
+    const result = await api(`/api/player-detail?id=${encodeURIComponent(player.id)}`);
+    if (request === detailRequest && dialog.open) renderPlayerDetail(result.player, '已联网获取详情；仅供查看，不会自动导入或修改缓存。');
+  } catch (error) {
+    if (request === detailRequest && dialog.open) renderPlayerDetail(player, `详情获取失败：${error.message}${local ? ' 当前显示本地缓存。' : ''}`);
+  }
+}
+$('#player-detail-close').addEventListener('click', () => $('#player-detail-dialog').close());
+$('#player-detail-dialog').addEventListener('close', () => { detailRequest += 1; });
 function renderPitch() {
   const pitch = $('#pitch');
   pitch.querySelectorAll('.pitch-player').forEach((element) => element.remove());
@@ -93,8 +389,11 @@ function renderPlayers() {
     const row = document.createElement('article');
     row.className = 'player-row';
     const time = new Date(player.fetched_at).toLocaleString('zh-CN');
-    const stats = Object.entries(player.attributes || {}).map(([name, value]) => `${name} ${value}`).join(' · ');
-    row.innerHTML = `<div class="player-monogram">${escapeHtml(player.name.charAt(0))}</div><div class="player-information"><strong>${escapeHtml(player.name)} <span>${escapeHtml(player.ovr)}</span></strong><small>${escapeHtml(player.season)} · ${escapeHtml(player.position)} ${player.club ? '· ' + escapeHtml(player.club) : ''}</small><small>${escapeHtml(stats || '暂无主要能力摘要')}</small><small>获取于 ${escapeHtml(time)} · <a href="${escapeHtml(player.source_url)}" target="_blank" rel="noopener noreferrer">查看来源 ↗</a></small></div><div class="player-actions"><button type="button" class="link-player">关联到 ${escapeHtml(state.selected)}</button><button type="button" class="refresh-player">刷新</button></div>`;
+    const stats = Object.entries(player.attributes || {}).slice(0, 6).map(([name, value]) => `${name} ${value}`).join(' · ');
+    row.innerHTML = `${playerPosition(player.position)}<div class="player-portrait-slot"></div><div class="player-information"><strong><span class="season-icon-slot"></span><button class="player-detail-link" type="button">${escapeHtml(player.name)}</button></strong><small>${escapeHtml(player.season || '未知赛季')}${player.club ? ' · ' + escapeHtml(player.club) : ''}</small><small>${escapeHtml(stats || '暂无主要能力摘要')}</small><small>获取于 ${escapeHtml(time)} · <a href="${escapeHtml(player.source_url)}" target="_blank" rel="noopener noreferrer">查看来源 ↗</a></small></div>${playerMetrics(player)}<div class="player-actions"><button type="button" class="link-player">关联到 ${escapeHtml(state.selected)}</button><button type="button" class="refresh-player">刷新</button></div>`;
+    row.querySelector('.player-detail-link').addEventListener('click', () => openPlayerDetail(player, true));
+    row.querySelector('.player-portrait-slot').append(playerPortrait(player, list.childElementCount < 8));
+    row.querySelector('.season-icon-slot').replaceWith(seasonBadge(player.season));
     row.querySelector('.link-player').addEventListener('click', async () => {
       if (editorIsDirty() && !window.confirm('位置编辑有未保存的修改，关联后将丢失。继续吗？')) return;
       const selected = slot();
@@ -122,6 +421,33 @@ async function importPlayer(url) {
     $('#player-url').value = '';
   } catch (error) { notify(error.message); }
   finally { button.disabled = false; button.textContent = '导入 / 刷新 ↗'; }
+}
+async function searchOnlinePlayers(query) {
+  const button = $('#online-search-form button');
+  const status = $('#online-search-status');
+  const results = $('#online-search-results');
+  button.disabled = true;
+  status.textContent = '正在搜索 FIFA Addict…';
+  results.replaceChildren();
+  try {
+    const result = await api(`/api/player-search?q=${encodeURIComponent(query)}`);
+    status.textContent = (result.players.length ? `找到 ${result.players.length} 条结果${result.truncated ? '，仅显示前 100 条，请使用更精确的名称' : ''}。请选择对应赛季导入。` : '未找到匹配的球员，请尝试其他名称。') + (result.warning ? ` ${result.warning}` : '');
+    for (const player of result.players) {
+      const row = document.createElement('article');
+      row.className = 'player-row';
+      row.innerHTML = `${playerPosition(player.position)}<div class="player-portrait-slot"></div><div class="player-information"><strong><span class="season-icon-slot"></span><button class="player-detail-link" type="button">${escapeHtml(player.name)}</button></strong><small>赛季 ${escapeHtml(player.season || '未知')}</small></div>${playerMetrics(player)}<div class="player-actions"><button class="import-player" type="button">导入详情</button></div>`;
+      row.querySelector('.player-detail-link').addEventListener('click', () => openPlayerDetail(player, false));
+      row.querySelector('.player-portrait-slot').append(playerPortrait(player, results.childElementCount < 8));
+      row.querySelector('.season-icon-slot').replaceWith(seasonBadge(player.season));
+      row.querySelector('.import-player').addEventListener('click', async (event) => {
+        const importButton = event.currentTarget;
+        importButton.disabled = true;
+        try { await importPlayer(player.id); } finally { importButton.disabled = false; }
+      });
+      results.append(row);
+    }
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 function renderRecognition(players) {
   const root = $('#recognition-results');
@@ -214,6 +540,7 @@ $('#clear-slot').addEventListener('click', async () => {
   delete selected.player_id;
   try { await saveSquad(); notify('位置已清空。'); } catch (error) { notify(error.message); }
 });
+$('#online-search-form').addEventListener('submit', (event) => { event.preventDefault(); searchOnlinePlayers($('#online-search').value.trim()); });
 $('#player-form').addEventListener('submit', (event) => { event.preventDefault(); importPlayer($('#player-url').value); });
 $('#search').addEventListener('input', renderPlayers);
 const capture = { image: null, crop: null, start: null, generation: 0, stream: null };

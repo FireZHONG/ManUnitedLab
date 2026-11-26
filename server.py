@@ -46,6 +46,18 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == '/api/players':
             query = parse_qs(parsed.query).get('q', [''])[0][:100]
             return self.respond(200, {'players': storage.search_players(query)})
+        if parsed.path == '/api/player-search':
+            query = parse_qs(parsed.query).get('q', [''])[0]
+            try:
+                return self.respond(200, data_source.search_players(query))
+            except ValueError as exc:
+                return self.respond(400, {'error': str(exc)})
+        if parsed.path == '/api/player-detail':
+            identifier = parse_qs(parsed.query).get('id', [''])[0]
+            try:
+                return self.respond(200, {'player': data_source.fetch_player(identifier)})
+            except ValueError as exc:
+                return self.respond(400, {'error': str(exc)})
         if parsed.path == '/api/config':
             return self.respond(200, agent.configuration_status())
         if parsed.path == '/api/secrets':
@@ -65,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(content)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https://s1.fifaaddict.com; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
+        self.send_header('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https://s1.fifaaddict.com https://fifaaddict.com; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
         self.end_headers()
         self.wfile.write(content)
 
