@@ -1,0 +1,14 @@
+data/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-journal
+*.sqlite-wal
+*.sqlite3-wal
+*.sqlite-shm
+*.sqlite3-shm
+sync/.snapshot-*.tmp

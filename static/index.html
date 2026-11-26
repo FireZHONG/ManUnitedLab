@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101614">
+  <title>红魔战术室 · FC Online 阵容助手</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" aria-label="红魔战术室首页"><span class="brand-mark">R<span>.</span></span><span><strong>红魔战术室</strong><small>FC ONLINE ASSISTANT</small></span></a>
+      <div class="sidebar-label">WORKSPACE <span>01</span></div>
+      <nav class="navigation" aria-label="主导航">
+        <a class="nav-link active" href="#overview"><span class="nav-icon">▦</span> 阵容总览 <span class="nav-number">01</span></a>
+        <a class="nav-link" href="#library"><span class="nav-icon">⌕</span> 球员资料 <span class="nav-number">02</span></a>
+        <a class="nav-link" href="#coach"><span class="nav-icon">✳</span> 战术助手 <span class="nav-number">03</span></a>
+      </nav>
+      <div class="sidebar-bottom"><span class="live-dot"></span><span><strong>本地工作空间</strong><small>你的阵容保存在本机</small></span></div>
+    </aside>
+
+    <main class="main" id="overview">
+      <header class="topbar"><div class="breadcrumb">工作空间 <span>/</span> <strong>阵容总览</strong></div><div class="top-right"><span class="local-tag"><i></i> LOCAL WORKSPACE</span><button class="button ghost settings-open" id="settings-open" type="button">设置</button><span class="avatar">MU</span></div></header>
+      <div class="page-content">
+        <section class="welcome"><div><div class="eyebrow"><span></span> MATCHDAY WORKSPACE <b> / 01</b></div><h1>你的球队，你的<span>比赛方式。</span></h1><p>从阵容到战术，做更有依据的每一个决定。</p></div><div class="welcome-meta"><span>YOUR SQUAD</span><strong>THE REDS <em>↗</em></strong><small>BUILT FOR THE BEAUTIFUL GAME</small></div></section>
+
+        <section class="dashboard-grid">
+          <div class="formation-card panel">
+            <div class="panel-head"><div><div class="section-kicker">SQUAD OVERVIEW <span>01</span></div><h2>首发阵容 <span class="formation-badge" id="formation-label">4-1-2-3</span></h2><p>选择球场上的位置，编辑对应球员。</p></div><button class="button ghost" id="upload-open" type="button"><span>＋</span> 导入截图</button></div>
+            <div class="pitch-wrap"><div class="pitch-top"><span>STARTING XI</span><span><span id="filled-count">0</span> / 11 PLAYERS</span></div><div class="pitch" id="pitch"><div class="pitch-mark center-line"></div><div class="pitch-mark center-circle"></div><div class="pitch-mark box-top"></div><div class="pitch-mark box-bottom"></div><div class="pitch-mark center-dot"></div></div><div class="pitch-bottom"><span><i></i> 点击位置编辑球员</span><span>HOME · 曼联队套</span></div></div>
+            <div class="formation-foot"><span><i></i> 手动排位</span><span>阵容保存在本地 <strong>↗</strong></span></div>
+          </div>
+
+          <div class="right-column">
+            <div class="editor-card panel" id="editor"><div class="section-kicker">PLAYER DETAILS <span>02</span></div><div class="editor-heading"><div><h2>位置编辑</h2><p>补充你已经确认的信息。</p></div><span class="slot-tag" id="selected-slot">ST</span></div>
+              <label>场上位置<select id="slot-position"><option>ST</option><option>CF</option><option>LW</option><option>RW</option><option>CAM</option><option>LM</option><option>RM</option><option>CM</option><option>CDM</option><option>LWB</option><option>RWB</option><option>LB</option><option>RB</option><option>CB</option><option>GK</option></select></label>
+              <label>球员名称<input id="slot-name" placeholder="例如：Wayne Rooney" maxlength="100"></label>
+              <div class="field-row"><label>卡片赛季<input id="slot-season" placeholder="例如：ICON" maxlength="100"></label><label>强化等级<input id="slot-level" placeholder="例如：+5" maxlength="30"></label></div>
+              <div class="linked-player" id="linked-player">尚未关联球员数据</div>
+              <div class="editor-actions"><button class="button primary" id="save-slot" type="button">保存球员 <span>↗</span></button><button class="button text-button" id="clear-slot" type="button">清空</button></div>
+              <p class="helper">手动填写的名称不会自动关联球员卡；请从下方球员资料中选择对应卡片。</p>
+            </div>
+            <div class="note-card"><div class="note-icon">✳</div><div><strong>让建议更懂你的打法</strong><p>在战术助手中告诉我你的习惯、预算和遇到的问题。</p><a href="#coach">开始分析 <span>↗</span></a></div></div>
+          </div>
+        </section>
+
+        <section class="lower-grid">
+          <div class="panel library-card" id="library"><div class="section-kicker">PLAYER DATABASE <span>03</span></div><div class="section-title"><div><h2>球员资料</h2><p>按需导入，保留来源和更新时间。</p></div><span class="section-number">01 — 02</span></div>
+            <div class="source-note"><span>i</span><p>FIFA Addict 是独立球迷站。中文页面不代表国服官方数据，卡片上架与价格请以游戏内为准。</p></div>
+            <form id="player-form"><label for="player-url">导入球员详情链接</label><div class="input-action"><input id="player-url" type="url" placeholder="https://cn.fifaaddict.com/fo4db/pid..." required><button class="button dark" type="submit">导入 / 刷新 <span>↗</span></button></div></form>
+            <div class="library-tools"><div><strong>本地球员库</strong><small>搜索已导入的球员</small></div><a href="https://cn.fifaaddict.com/fo4db" target="_blank" rel="noopener noreferrer">前往 FIFA Addict 查找 ↗</a></div><input id="search" placeholder="搜索球员、赛季或位置" aria-label="搜索本地球员库"><div class="player-list" id="player-list"></div><div class="empty-state" id="players-empty">还没有导入球员。前往球员网站复制详情链接，粘贴到上方。</div>
+          </div>
+          <div class="panel coach-card" id="coach"><div class="section-kicker">TACTICAL ASSISTANT <span>04</span></div><div class="section-title"><div><h2>战术助手</h2><p>基于你的阵容，聊聊下一场比赛。</p></div><span class="ai-indicator" id="model-status">检查配置中</span></div>
+            <label class="model-select">模型来源<select id="model-mode"><option value="local">本地 Ollama</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="online">其他在线服务</option></select></label><p class="model-hint" id="model-hint" aria-live="polite">正在检查模型配置…</p>
+            <div class="chat-area" id="chat-area"><div class="coach-intro"><div class="coach-symbol">✳</div><strong>准备好聊聊你的球队了吗？</strong><p>试着问我阵容的优缺点，或者如何让 4-1-2-3 更适合你的进攻习惯。</p><div class="prompt-chips"><button type="button" data-prompt="分析我的曼联 4-1-2-3 阵容，指出攻防平衡和位置适配问题。">分析我的阵容 ↗</button><button type="button" data-prompt="我喜欢快速反击，请根据我的阵容给出手动排位的战术思路。">快速反击怎么踢？ ↗</button></div></div></div>
+            <form id="chat-form"><label for="chat-input" class="sr-only">输入你的问题</label><div class="chat-input-wrap"><textarea id="chat-input" rows="2" placeholder="例如：我的中场该如何搭配？" required maxlength="5000"></textarea><button class="send-button" type="submit" aria-label="发送">↑</button></div><p class="privacy" id="chat-privacy">问题、对话和阵容摘要将发送到当前选定的模型服务。</p></form>
+          </div>
+        </section>
+        <footer class="footer"><span>RED TACTICS ROOM <b> / </b> FC ONLINE ASSISTANT</span><span>独立工具 · 非官方应用</span></footer>
+      </div>
+    </main>
+  </div>
+  <dialog id="upload-dialog"><div class="dialog-head"><div><div class="section-kicker">IMPORT SQUAD</div><h2>导入阵容截图</h2></div><button class="close-button" id="upload-close" aria-label="关闭">×</button></div><p id="vision-privacy">可选择本地图片或截取桌面。截图只在点击发送后传给当前选定的模型服务，识别结果需要逐项确认。</p><button class="button dark full" id="capture-screen" type="button">截取桌面或游戏窗口 <span>↗</span></button><p class="capture-hint">浏览器会让你选择屏幕或窗口；截图后立即停止共享。全屏游戏无法捕获时，可尝试窗口或无边框模式。</p><div class="capture-preview" id="capture-preview" hidden><div class="capture-preview-head"><strong>截图预览</strong><button type="button" id="reset-crop">使用完整截图</button></div><p>在图片上拖动选择要识别的区域；未选择时使用完整截图。</p><canvas id="capture-canvas" aria-label="桌面截图预览，可用鼠标或触屏拖动选择识别区域"></canvas><small id="crop-status">当前使用完整截图</small></div><label class="upload-box" for="image-input"><span>↑</span><strong>或选择一张本地截图</strong><small>PNG / JPG / WEBP，最大 4 MB</small></label><input id="image-input" type="file" accept="image/png,image/jpeg,image/webp"><div id="image-name"></div><button class="button primary full" id="recognize" type="button">发送截图并识别 <span>↗</span></button><div id="recognition-results"></div><p class="dialog-foot">不支持视觉的模型无法识别截图，你仍可手动填写阵容。</p></dialog>
+  <dialog id="settings-dialog">
+    <div class="dialog-head"><div><div class="section-kicker">LOCAL SETTINGS</div><h2>设置与手动同步</h2></div><button class="close-button" id="settings-close" type="button" aria-label="关闭">×</button></div>
+    <p class="settings-intro">密钥仅保存在本机，使用 Windows 当前账户加密。不要把密钥放进阵容备注或同步文件。</p>
+    <section class="settings-section"><h3>本机 API 密钥</h3><p>保存后立即生效。密钥不会显示或同步到其他设备；使用在线模型可能产生费用。</p>
+      <form class="key-form" data-provider="openai"><div class="key-heading"><strong>OpenAI</strong><span id="openai-key-status">检查中…</span></div><label>新增或替换密钥<input type="password" name="key" placeholder="输入 OpenAI API Key" autocomplete="off" maxlength="512" required></label><div class="settings-actions"><button class="button primary" type="submit">保存密钥</button><button class="button text-button key-delete" type="button">删除本机密钥</button></div></form>
+      <form class="key-form" data-provider="deepseek"><div class="key-heading"><strong>DeepSeek</strong><span id="deepseek-key-status">检查中…</span></div><label>新增或替换密钥<input type="password" name="key" placeholder="输入 DeepSeek API Key" autocomplete="off" maxlength="512" required></label><div class="settings-actions"><button class="button primary" type="submit">保存密钥</button><button class="button text-button key-delete" type="button">删除本机密钥</button></div></form>
+    </section>
+    <section class="settings-section"><h3>Git 手动同步</h3><p>从 Git 拉取后导入；修改后导出，再自行检查、提交并推送。只同步阵容与已缓存球员，不包含密钥、截图或对话。仓库成员可查看数据及历史。</p><div class="sync-status" id="sync-status" role="status">检查同步状态中…</div><div class="settings-actions"><button class="button dark" id="sync-import" type="button">导入同步数据</button><button class="button ghost" id="sync-export" type="button">导出同步数据</button></div><p>导入会替换本机阵容与球员缓存。遇到 Git 冲突，请先解决冲突，再导入或导出。</p></section>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
