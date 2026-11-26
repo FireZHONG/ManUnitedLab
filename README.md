@@ -2,6 +2,8 @@
 
 一个运行在 Windows 本机的 FC Online 阵容与战术助手。默认阵容为曼联队套 4-1-2-3，适用于手动排位分析。项目仅使用 Python 标准库，不需要安装额外依赖。
 
+跨设备维护时，请让 Verdent 或其他编码代理先阅读 [维护约定](AGENTS.md) 和 [项目需求与维护基线](PROJECT_REQUIREMENTS.md)。这些文档随 Git 同步，不依赖聊天记录；不支持自动读取 `AGENTS.md` 的工具需要在任务中明确引用。
+
 ## 启动
 
 需要 Python 3.10 或更高版本。打开 Windows 命令提示符：
