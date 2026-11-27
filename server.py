@@ -108,7 +108,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/sync/export':
                 result = sync.export(body.get('file_hash'), body.get('data_hash'), body.get('force') is True)
             elif path == '/api/sync/import':
-                result = sync.import_snapshot(body.get('file_hash'), body.get('data_hash'))
+                result = sync.import_snapshot(body.get('file_hash'), body.get('data_hash'), body.get('allow_legacy_tactics') is True, body.get('allow_legacy_substitutes') is True)
             elif path == '/api/player':
                 value = body.get('url', '')
                 if not isinstance(value, str):

@@ -38,11 +38,11 @@ def file_bytes():
 
 def data_from(connection):
     row = connection.execute('SELECT value FROM settings WHERE key = ?', ('squad',)).fetchone()
-    squad = json.loads(row[0]) if row else storage.default_squad()
+    squad = storage.with_substitutes(json.loads(row[0])) if row else storage.default_squad()
     players = [json.loads(row[0]) for row in connection.execute('SELECT data FROM players ORDER BY id')]
-    squad = {key: squad.get(key, '') for key in SQUAD_FIELDS} | {'slots': [{key: slot[key] for key in SLOT_FIELDS if key in slot} for slot in squad['slots']]}
+    squad = {key: squad.get(key, '') for key in SQUAD_FIELDS} | {key: squad[key] for key in ('team_tactics',) if key in squad} | {'slots': [{key: slot[key] for key in SLOT_FIELDS + ('personal_tactics',) if key in slot} for slot in squad['slots']], 'substitutes': [{key: slot[key] for key in SLOT_FIELDS if key in slot} for slot in squad['substitutes']]}
     players = [{key: player[key] for key in PLAYER_FIELDS + OPTIONAL_PLAYER_FIELDS if key in player} for player in players]
-    return {'version': 1, 'squad': squad, 'players': players}
+    return {'version': 3, 'squad': squad, 'players': players}
 
 
 def baseline_from(connection):
@@ -53,16 +53,32 @@ def baseline_from(connection):
 def status():
     raw = file_bytes()
     file_hash = digest(raw) if raw is not None else None
+    snapshot_version = None
+    if raw is not None:
+        try:
+            snapshot = json.loads(raw.decode('utf-8'))
+            if isinstance(snapshot, dict) and type(snapshot.get('version')) is int:
+                snapshot_version = snapshot['version']
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
     with storage.connect() as connection:
-        data_hash = digest(encode(data_from(connection)))
+        data = data_from(connection)
+        data_hash = digest(encode(data))
         baseline = baseline_from(connection)
     return {'exists': raw is not None, 'file_hash': file_hash, 'data_hash': data_hash,
             'file_changed': raw is not None and file_hash != baseline.get('file_hash'),
-            'data_changed': data_hash != baseline.get('data_hash'), 'has_baseline': bool(baseline)}
+            'data_changed': data_hash != baseline.get('data_hash'), 'has_baseline': bool(baseline),
+            'snapshot_version': snapshot_version,
+            'legacy_tactics_conflict': snapshot_version == 1 and storage.has_tactics(data['squad']),
+            'legacy_substitutes_conflict': snapshot_version in (1, 2) and has_substitutes(data['squad'])}
+
+
+def has_substitutes(squad):
+    return any(any(slot.get(field) for field in ('position', 'name', 'season', 'level', 'player_id')) for slot in squad.get('substitutes', []))
 
 
 def validate(snapshot):
-    if not isinstance(snapshot, dict) or set(snapshot) != {'version', 'squad', 'players'} or type(snapshot['version']) is not int or snapshot['version'] != 1:
+    if not isinstance(snapshot, dict) or set(snapshot) != {'version', 'squad', 'players'} or type(snapshot['version']) is not int or snapshot['version'] not in (1, 2, 3):
         raise ValueError('同步文件版本或结构无效。')
     players = snapshot['players']
     if not isinstance(players, list) or len(players) > 20000:
@@ -115,10 +131,21 @@ def validate(snapshot):
             if not isinstance(item, dict) or set(item) != {'year', 'team', 'loan'} or not isinstance(item['year'], str) or len(item['year']) > 100 or not isinstance(item['team'], str) or len(item['team']) > 200 or type(item['loan']) is not bool:
                 raise ValueError('同步文件中的俱乐部经历无效。')
     squad = snapshot['squad']
-    if not isinstance(squad, dict) or set(squad) != set(SQUAD_FIELDS) | {'slots'} or not isinstance(squad.get('slots'), list):
+    squad_fields = set(SQUAD_FIELDS) | {'slots'}
+    slot_fields = set(SLOT_FIELDS)
+    required_fields = set(SQUAD_FIELDS) | {'slots'}
+    if snapshot['version'] >= 2:
+        squad_fields.add('team_tactics')
+        slot_fields.add('personal_tactics')
+    if snapshot['version'] == 3:
+        squad_fields.add('substitutes')
+        required_fields.add('substitutes')
+    if not isinstance(squad, dict) or not required_fields.issubset(squad) or not set(squad).issubset(squad_fields) or not isinstance(squad.get('slots'), list):
         raise ValueError('同步文件中的阵容格式无效。')
-    if any(not isinstance(slot, dict) or not set(slot).issubset(SLOT_FIELDS) or not {'key', 'position'}.issubset(slot) for slot in squad['slots']):
+    if any(not isinstance(slot, dict) or not set(slot).issubset(slot_fields) or not {'key', 'position'}.issubset(slot) for slot in squad['slots']):
         raise ValueError('同步文件中的阵容位置无效。')
+    if snapshot['version'] == 3 and (not isinstance(squad['substitutes'], list) or any(not isinstance(slot, dict) or not set(slot).issubset(SLOT_FIELDS) or not {'key', 'position'}.issubset(slot) for slot in squad['substitutes'])):
+        raise ValueError('同步文件中的替补席位无效。')
     storage.validate_squad(squad, identifiers)
     return snapshot
 
@@ -166,7 +193,7 @@ def export(expected_file_hash, expected_data_hash, force=False):
     return status()
 
 
-def import_snapshot(expected_file_hash, expected_data_hash):
+def import_snapshot(expected_file_hash, expected_data_hash, allow_legacy_tactics=False, allow_legacy_substitutes=False):
     raw = file_bytes()
     if raw is None:
         raise ValueError('没有同步文件，请先从 Git 拉取或在其他设备导出。')
@@ -178,11 +205,16 @@ def import_snapshot(expected_file_hash, expected_data_hash):
         raise ValueError('同步文件不是有效 JSON，可能存在未解决的 Git 冲突。') from exc
     with storage.connect() as connection:
         connection.execute('BEGIN IMMEDIATE')
-        if digest(encode(data_from(connection))) != expected_data_hash:
+        current = data_from(connection)
+        if digest(encode(current)) != expected_data_hash:
             raise ValueError('本机数据已变化，请刷新状态后重试。')
         latest = file_bytes()
         if latest is None or digest(latest) != expected_file_hash:
             raise ValueError('同步文件已变化，请刷新状态后重试。')
+        if value['version'] == 1 and storage.has_tactics(current['squad']) and allow_legacy_tactics is not True:
+            raise ValueError('旧版同步文件不含战术，导入将清除本机战术，请先确认。')
+        if value['version'] in (1, 2) and has_substitutes(current['squad']) and allow_legacy_substitutes is not True:
+            raise ValueError('旧版同步文件不含替补，导入将清除本机替补，请先确认。')
         connection.execute('DELETE FROM players')
         connection.executemany('INSERT INTO players (id, data) VALUES (?, ?)', [(player['id'], json.dumps(player, ensure_ascii=False)) for player in value['players']])
         connection.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ('squad', json.dumps(value['squad'], ensure_ascii=False)))

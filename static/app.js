@@ -1,7 +1,34 @@
-const state = { squad: null, players: [], selected: 'ST', messages: [], busy: false, recognizing: false, mode: 'local', config: null };
+const modelModes = ['openai', 'deepseek', 'online', 'local'];
+const modelStorageKey = 'fc-online-model-mode';
+let modelStorageAvailable = true;
+function savedModelMode() {
+  try {
+    const mode = localStorage.getItem(modelStorageKey);
+    return modelModes.includes(mode) ? mode : 'openai';
+  } catch (error) {
+    modelStorageAvailable = false;
+    return 'openai';
+  }
+}
+const state = { squad: null, players: [], selected: 'ST', messages: [], busy: false, recognizing: false, mode: savedModelMode(), config: null };
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
-const coordinates = { LW: [17, 19], ST: [50, 12], RW: [83, 19], LCM: [31, 38], RCM: [69, 38], CDM: [50, 55], LB: [13, 72], LCB: [38, 75], RCB: [62, 75], RB: [87, 72], GK: [50, 91] };
+const coordinates = { LW: [18, 20], ST: [50, 14], RW: [82, 20], LCM: [33, 39], RCM: [67, 39], CDM: [50, 55], LB: [13, 72], LCB: [35, 72], RCB: [65, 72], RB: [87, 72], GK: [50, 90] };
+const personalTacticNames = { AR: '进攻跑动', CC: '创造机会', AS: '进攻倾向', DS: '防守倾向', DP: '压迫防守', DB: '防守', IN: '拦截', PF: '自由跑动', SC: '传中', SR: '积极跑动' };
+const personalTacticOptions = {
+  forward: { AR: ['均衡的进攻', '前插', '禁区射手', '隐形进攻球员'], DP: ['基础防守支援', '积极参与防守', '留在前场'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'], SR: ['均衡的跑动', '广阔的区域', '留在中央'] },
+  wing: { CC: ['适当的创造机会', '突破防守球员', '位于边路'], DS: ['基础防守支援', '积极参与防守', '留在前场'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'], SC: ['均衡的传中', '插入到对方禁区内', '伺机插入'], SR: ['均衡的渗透支援', '向前插入', '靠近队友', '禁区射手'] },
+  attackingMidfield: { DS: ['基础防守支援', '积极参与防守', '留在前场'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'], PF: ['维持位置', '自由人', '利用球场宽度'], SC: ['均衡的传中', '插入到对方禁区内', '伺机插入'] },
+  midfield: { AS: ['均衡的进攻', '进攻时留在后场', '参与进攻', '防线肋部'], DP: ['照应边路', '照应中路'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'], PF: ['维持位置', '自由人', '利用球场宽度'], SC: ['均衡的传中', '插入到对方禁区内', '伺机插入'] },
+  defensiveMidfield: { AS: ['均衡的进攻', '进攻时留在后场', '参与进攻', '防线肋部'], DP: ['照应边路', '照应中路'], DB: ['均衡的防守', '拦截传球', '人盯人防守'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'], PF: ['维持位置', '自由人', '利用球场宽度'], SC: ['均衡的传中', '插入到对方禁区内', '伺机插入'] },
+  centerBack: { AS: ['进攻时留在后场', '参与进攻', '充当进攻球员角色'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'] },
+  fullBack: { AR: ['均衡的进攻', '积极叠瓦式助攻', '不参与进攻'], IN: ['普通拦截', '积极的拦截', '稳健的拦截'], SR: ['均衡的跑动', '支援中路', '叠瓦式'] },
+};
+personalTacticOptions.wideMidfield = { CC: personalTacticOptions.wing.CC, DS: personalTacticOptions.wing.DS, IN: personalTacticOptions.wing.IN, PF: personalTacticOptions.attackingMidfield.PF, SC: personalTacticOptions.wing.SC, SR: personalTacticOptions.wing.SR };
+function optionsForPosition(position) {
+  const groups = { ST: 'forward', CF: 'forward', LW: 'wing', RW: 'wing', CAM: 'attackingMidfield', LM: 'wideMidfield', RM: 'wideMidfield', CM: 'midfield', CDM: 'defensiveMidfield', CB: 'centerBack', LB: 'fullBack', RB: 'fullBack', LWB: 'fullBack', RWB: 'fullBack' };
+  return personalTacticOptions[groups[position]] || {};
+}
 let toastTimer;
 const seasonBadgeData = `
 ICONTM|ICON THE MOMENT|0
@@ -221,7 +248,9 @@ function notify(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 4500);
 }
-function slot() { return state.squad.slots.find((item) => item.key === state.selected); }
+function allSlots(squad = state.squad) { return [...squad.slots, ...squad.substitutes]; }
+function slot() { return allSlots().find((item) => item.key === state.selected); }
+function isSubstitute(item) { return item.key.startsWith('SUB'); }
 function playerById(id) { return state.players.find((player) => player.id === id); }
 function shortName(name) {
   if (!name) return '添加球员';
@@ -321,6 +350,69 @@ async function openPlayerDetail(player, local) {
 }
 $('#player-detail-close').addEventListener('click', () => $('#player-detail-dialog').close());
 $('#player-detail-dialog').addEventListener('close', () => { detailRequest += 1; });
+function tacticColor(code) {
+  if (['CC', 'AR', 'AS'].includes(code)) return 'red';
+  if (['SC', 'SR'].includes(code)) return 'green';
+  if (['DS', 'DP', 'DB'].includes(code)) return 'blue';
+  if (['IN', 'PF'].includes(code)) return 'teal';
+  return 'neutral';
+}
+function tacticDescription(tactics = {}) {
+  const parts = (tactics.instructions || []).map((item) => `${item.code} ${item.value}`);
+  if (tactics.attack_work_rate != null) parts.push(`进攻倾向 ${tactics.attack_work_rate}`);
+  if (tactics.defense_work_rate != null) parts.push(`防守倾向 ${tactics.defense_work_rate}`);
+  return parts.length ? parts.join('，') : '个人战术未设置';
+}
+function enhancementLevel(value) {
+  const match = String(value || '').trim().match(/^\+?\s*(\d{1,2})\s*强?$/);
+  const level = match ? Number(match[1]) : null;
+  return level >= 1 && level <= 13 ? level : null;
+}
+function enhancementStyle(value) {
+  const level = enhancementLevel(value);
+  if (level == null) return { style: 'unknown', label: '卡色未识别' };
+  if (level >= 1 && level <= 4) return { style: 'bronze', label: '铜卡' };
+  if (level <= 7 && level >= 5) return { style: 'silver', label: '银卡' };
+  if (level <= 10 && level >= 8) return { style: 'gold', label: '金卡' };
+  if (level <= 13 && level >= 11) return { style: 'diamond', label: '钻石卡' };
+  return { style: 'unknown', label: '卡色未识别' };
+}
+const fullPlayerLevelBonus = 4;
+const enhancementOvrBonus = [null, 0, 1, 2, 4, 6, 8, 11, 15, 17, 19, 21, 24, 27];
+const enhancementTeams = [
+  { name: '银卡军团', minimum: 5, bonuses: [1, 2] },
+  { name: '金卡军团', minimum: 8, bonuses: [2, 3] },
+  { name: '钻石军团', minimum: 11, bonuses: [3, 4] },
+];
+function estimatePitchRating(item, linked, starters) {
+  const base = linked?.ovr;
+  if (!Number.isInteger(base) || base < 0) return { value: null, explanation: '缺少关联球员的来源总评' };
+  const level = enhancementLevel(item.level);
+  if (level == null) return { value: null, explanation: `数据源总评 ${base}；请填写 1–13 的强化等级` };
+  const filled = starters.filter((starter) => starter.name?.trim());
+  const unknown = filled.filter((starter) => enhancementLevel(starter.level) == null).length;
+  const club = filled.length >= 11 ? 4 : filled.length >= 8 ? 3 : filled.length >= 3 ? 1 : 0;
+  const teams = enhancementTeams.filter((team) => level >= team.minimum).map((team) => {
+    const count = filled.filter((starter) => enhancementLevel(starter.level) >= team.minimum).length;
+    const bonus = (total) => total >= 8 ? team.bonuses[1] : total >= 5 ? team.bonuses[0] : 0;
+    return { name: team.name, minimum: bonus(count), maximum: bonus(count + unknown) };
+  });
+  const minimum = Math.max(0, ...teams.map((team) => team.minimum));
+  const maximum = Math.max(0, ...teams.map((team) => team.maximum));
+  if (minimum !== maximum) return { value: null, explanation: `数据源总评 ${base}；其他首发强化等级未填写，军团加成不确定` };
+  const applied = [...teams].reverse().find((team) => team.minimum === minimum && minimum > 0);
+  const teamName = unknown && minimum ? '强化军团' : applied?.name || '强化军团';
+  const enhancement = enhancementOvrBonus[level];
+  return { value: base + fullPlayerLevelBonus + enhancement + club + minimum, explanation: `估算总评：数据源 ${base}（按 1 强、1 级基准假设） + 球员满级 ${fullPlayerLevelBonus} + 强化 ${enhancement} + 曼联套 ${club} + ${teamName} ${minimum}；仅按首发统计，未计算细项加成` };
+}
+function estimateSubstituteRating(item, linked) {
+  const base = linked?.ovr;
+  if (!Number.isInteger(base) || base < 0) return { value: null, label: '总评', explanation: '缺少关联球员的来源总评' };
+  const level = enhancementLevel(item.level);
+  if (level == null) return { value: base, label: '来源总评', explanation: `数据源总评 ${base}；填写 1–13 的强化等级后可计算个人总评` };
+  const enhancement = enhancementOvrBonus[level];
+  return { value: base + fullPlayerLevelBonus + enhancement, label: '总评', explanation: `个人总评：数据源 ${base}（按 1 强、1 级基准假设） + 球员满级 ${fullPlayerLevelBonus} + 强化 ${enhancement}；未计算队套、军团及细项加成，可能与游戏不同` };
+}
 function renderPitch() {
   const pitch = $('#pitch');
   pitch.querySelectorAll('.pitch-player').forEach((element) => element.remove());
@@ -331,29 +423,112 @@ function renderPitch() {
     player.className = `pitch-player ${item.key === state.selected ? 'selected' : ''} ${item.name ? 'has-player' : ''}`;
     player.style.left = `${position[0]}%`;
     player.style.top = `${position[1]}%`;
-    player.setAttribute('aria-label', `${item.position} ${item.name || '添加球员'}`);
-    player.innerHTML = `<span class="player-position">${escapeHtml(item.position)}</span><span class="player-shirt">${item.name ? escapeHtml(item.name.trim().charAt(0).toUpperCase()) : '+'}</span><span class="player-name">${escapeHtml(shortName(item.name))}</span>`;
+    const tactics = item.personal_tactics || {};
+    const instructions = tactics.instructions || [];
+    const description = tacticDescription(tactics);
+    const linked = playerById(item.player_id);
+    const rating = estimatePitchRating(item, linked, state.squad.slots);
+    const ovr = rating.value;
+    const salary = linked?.salary ?? null;
+    const ratingStyle = enhancementStyle(item.level);
+    const details = item.name ? `，估算总评 ${ovr ?? '未知'}，工资 ${salary ?? '未知'}，强化 ${item.level || '未设置'}${item.level ? `（${ratingStyle.label}）` : ''}，赛季 ${item.season || '未知'}` : '';
+    const source = linked ? `；FIFA Addict 数据获取于 ${linked.fetched_at ? new Date(linked.fetched_at).toLocaleString('zh-CN') : '未知时间'}；${rating.explanation}` : item.name ? '；未关联球员卡，头像、总评和工资未知' : '';
+    player.setAttribute('aria-label', `${item.position} ${item.name || '添加球员'}${details}，${description}${source}`);
+    player.title = `${item.position} ${item.name || '添加球员'}${details}；${description}${source}；点击查看或编辑`;
+    const badges = instructions.slice(0, 3).map((entry) => `<span class="pitch-instruction ${tacticColor(entry.code)}"><span>${escapeHtml(entry.code)}</span><span>${entry.value === 0 ? '' : escapeHtml(entry.value)}</span></span>`).join('');
+    const extra = instructions.length > 3 ? `<span class="pitch-extra">+${instructions.length - 3}</span>` : '';
+    const attack = tactics.attack_work_rate == null ? '' : `<span class="work-rate red">${escapeHtml(tactics.attack_work_rate)}</span>`;
+    const defense = tactics.defense_work_rate == null ? '' : `<span class="work-rate">${escapeHtml(tactics.defense_work_rate)}</span>`;
+    const face = item.name ? `<span class="pitch-player-visual"><span class="pitch-salary">${escapeHtml(salary ?? '—')}</span><span class="pitch-portrait-slot"></span><span class="pitch-ovr">${ovr == null ? '—' : escapeHtml(ovr)}</span></span>` : '<span class="player-shirt">+</span>';
+    const label = item.name ? `<span class="player-name"><span class="pitch-season"><span class="pitch-season-icon"></span><span class="pitch-season-text">${escapeHtml(item.season || '?')}</span></span><span class="pitch-name-text">${escapeHtml(shortName(item.name))}</span>${item.level ? `<span class="pitch-level ${ratingStyle.style}">${escapeHtml(item.level)}</span>` : ''}</span>` : '<span class="player-name">添加球员</span>';
+    player.innerHTML = `<span class="pitch-instructions" aria-hidden="true">${badges}${extra}</span><span class="player-position">${escapeHtml(item.position)}</span><span class="pitch-work-rates" aria-hidden="true">${attack}${defense}</span>${face}${label}`;
+    if (item.name) {
+      player.querySelector('.pitch-portrait-slot').append(playerPortrait(linked || { name: item.name }, true));
+      player.querySelector('.pitch-season-icon').replaceWith(seasonBadge(item.season));
+    }
     player.addEventListener('click', () => selectSlot(item.key));
     pitch.append(player);
   }
   $('#filled-count').textContent = state.squad.slots.filter((item) => item.name).length;
   $('#formation-label').textContent = state.squad.formation || '4-1-2-3';
+  renderBench();
+}
+function renderBench() {
+  const list = $('#bench-list');
+  list.replaceChildren();
+  for (const item of state.squad.substitutes) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `bench-player${item.key === state.selected ? ' selected' : ''}`;
+    button.setAttribute('aria-pressed', String(item.key === state.selected));
+    const linked = playerById(item.player_id);
+    const rating = estimateSubstituteRating(item, linked);
+    const position = linked?.position || '未知';
+    const salary = linked?.salary ?? '—';
+    const levelStyle = enhancementStyle(item.level);
+    const ratingText = rating.value == null ? '—' : String(rating.value);
+    const source = linked ? `FIFA Addict 获取时间：${linked.fetched_at ? new Date(linked.fetched_at).toLocaleString('zh-CN') : '未知'}` : '未关联球员卡';
+    const description = `替补 ${item.key.slice(3)}，${item.name || '添加球员'}，资料位置 ${position}，${item.position ? `已选位置 ${item.position}，` : ''}赛季 ${item.season || '未知'}，强化 ${item.level || '未设置'}，工资 ${salary}，${rating.label} ${ratingText}；${rating.explanation}；${source}`;
+    button.setAttribute('aria-label', description);
+    button.title = description;
+    button.innerHTML = item.name ? `<span class="bench-slot">${escapeHtml(item.key)} · ${escapeHtml(position)}</span><span class="bench-main"><span class="bench-portrait-slot"></span><span class="bench-metrics"><span class="bench-rating-label">${escapeHtml(rating.label)}</span><span class="bench-rating">${escapeHtml(ratingText)}</span><span class="bench-salary">工资 ${escapeHtml(salary)}</span></span></span><strong class="bench-name">${escapeHtml(item.name)}</strong><span class="bench-meta"><span class="pitch-season bench-season"><span class="bench-season-icon"></span><span class="pitch-season-text">${escapeHtml(item.season || '未知赛季')}</span></span><span class="pitch-level ${levelStyle.style}">${escapeHtml(item.level || '未设置')}</span></span>${item.position ? `<small>已选位置 ${escapeHtml(item.position)}</small>` : ''}` : `<span class="bench-slot">${escapeHtml(item.key)}</span><strong class="bench-empty">＋ 添加球员</strong><small>选择席位填写或关联</small>`;
+    if (item.name) {
+      button.querySelector('.bench-portrait-slot').append(playerPortrait(linked || { name: item.name }, true));
+      button.querySelector('.bench-season-icon').replaceWith(seasonBadge(item.season));
+    }
+    button.addEventListener('click', () => selectSlot(item.key));
+    list.append(button);
+  }
+  $('#bench-count').textContent = state.squad.substitutes.filter((item) => item.name).length;
+}
+function renderPersonalInstructions(position, instructions = []) {
+  const options = optionsForPosition(position);
+  const values = new Map(instructions.map((item) => [item.code, item.value]));
+  const codes = [...Object.keys(options), ...instructions.map((item) => item.code).filter((code) => !(code in options))];
+  $('#personal-instructions').innerHTML = codes.map((code) => {
+    const available = options[code] || [];
+    const value = values.get(code);
+    const legacy = value != null && !available[value];
+    const label = personalTacticNames[code] || '旧战术';
+    const choices = available.map((name, index) => `<option value="${index}"${value === index ? ' selected' : ''}>${escapeHtml(code)}${index || ''} · ${escapeHtml(name)}</option>`).join('');
+    const previous = legacy ? `<option value="${value}" selected disabled>保留旧值：${escapeHtml(code)} ${value}（请核对）</option>` : '';
+    return `<label class="instruction-row"><span class="instruction-label ${tacticColor(code)}"><strong>${escapeHtml(code)}</strong><small>${escapeHtml(label)}</small></span><select class="instruction-value" data-code="${escapeHtml(code)}" aria-label="${escapeHtml(label)} ${escapeHtml(code)}"><option value="">未设置</option>${choices}${previous}</select></label>`;
+  }).join('') || '<p class="instructions-empty">该位置暂无已核实的战术选项。</p>';
+}
+function renderWorkRate(selector, value) {
+  const select = $(selector);
+  select.innerHTML = '<option value="">未设置</option>' + [1, 2, 3].map((number) => `<option value="${number}">${number}</option>`).join('');
+  if (value != null && ![1, 2, 3].includes(value)) select.insertAdjacentHTML('beforeend', `<option value="${value}" disabled>保留旧值：${value}（请核对）</option>`);
+  select.value = value ?? '';
 }
 function renderEditor() {
   const selected = slot();
-  $('#selected-slot').textContent = selected.key;
+  $('#selected-slot').textContent = isSubstitute(selected) ? `替补 ${selected.key.slice(3)}` : selected.key;
+  $('.personal-tactics-editor').hidden = isSubstitute(selected);
   $('#slot-position').value = selected.position;
+  $('#slot-position').dataset.previousPosition = selected.position;
   $('#slot-name').value = selected.name || '';
   $('#slot-season').value = selected.season || '';
   $('#slot-level').value = selected.level || '';
+  const tactics = selected.personal_tactics || {};
+  renderPersonalInstructions(isSubstitute(selected) ? '' : selected.position, tactics.instructions || []);
+  renderWorkRate('#attack-work-rate', tactics.attack_work_rate);
+  renderWorkRate('#defense-work-rate', tactics.defense_work_rate);
   renderLinkedPlayer();
 }
 function renderLinkedPlayer() {
-  const linked = playerById(slot().player_id);
-  $('#linked-player').textContent = linked ? `已关联：${linked.name} · ${linked.season} · OVR ${linked.ovr}` : '尚未关联球员数据';
+  const selected = slot();
+  const linked = playerById(selected.player_id);
+  $('#linked-player').textContent = linked ? `已关联：${linked.name} · ${linked.season} · 数据源总评 ${linked.ovr ?? '未知'}` : '尚未关联球员数据';
+  const explanation = $('#slot-rating-explanation');
+  const rating = selected.name ? (isSubstitute(selected) ? estimateSubstituteRating(selected, linked) : estimatePitchRating(selected, linked, state.squad.slots)).explanation : '';
+  explanation.textContent = rating && linked ? `${rating}；FIFA Addict 获取时间：${linked.fetched_at ? new Date(linked.fetched_at).toLocaleString('zh-CN') : '未知'}` : rating;
+  explanation.hidden = !explanation.textContent;
 }
 function selectSlot(key) {
-  if (key !== state.selected && editorIsDirty() && !window.confirm('当前位置有未保存的修改，切换后将丢失。继续吗？')) return;
+  if (state.saving) return notify('正在保存阵容，请稍候。');
+  if (key === state.selected) return;
+  if (editorIsDirty() && !window.confirm('当前位置有未保存的修改，切换后将丢失。继续吗？')) return;
   state.selected = key;
   renderPitch();
   renderEditor();
@@ -361,22 +536,83 @@ function selectSlot(key) {
 }
 function editorIsDirty() {
   const selected = slot();
-  return $('#slot-position').value !== selected.position || $('#slot-name').value !== (selected.name || '') || $('#slot-season').value !== (selected.season || '') || $('#slot-level').value !== (selected.level || '');
+  const tactics = selected.personal_tactics || {};
+  const savedInstructions = new Map((tactics.instructions || []).map((item) => [item.code, String(item.value)]));
+  const chosen = Array.from(document.querySelectorAll('.instruction-value')).filter((input) => input.value !== '');
+  const changedInstructions = chosen.length !== savedInstructions.size || chosen.some((input) => savedInstructions.get(input.dataset.code) !== input.value);
+  return $('#slot-position').value !== selected.position || $('#slot-name').value !== (selected.name || '') || $('#slot-season').value !== (selected.season || '') || $('#slot-level').value !== (selected.level || '') || changedInstructions || $('#attack-work-rate').value !== String(tactics.attack_work_rate ?? '') || $('#defense-work-rate').value !== String(tactics.defense_work_rate ?? '');
 }
-async function saveSquad() {
-  state.squad = await post('/api/squad', state.squad);
-  renderPitch();
-  renderEditor();
+function readNumber(input, max, label) {
+  if (input.validity.badInput) throw new Error(`${label}必须是整数。`);
+  const value = input.value.trim();
+  if (!value) return null;
+  if (!/^\d+$/.test(value) || Number(value) > max) throw new Error(`${label}必须是 0 至 ${max} 的整数。`);
+  return Number(value);
 }
+function readPersonalTactics() {
+  const chosen = new Map();
+  for (const input of document.querySelectorAll('.instruction-value')) {
+    if (input.value !== '') chosen.set(input.dataset.code, Number(input.value));
+  }
+  if (chosen.size > 6) throw new Error('每个位置最多保存 6 项个人战术，请先清除不需要的旧值。');
+  const instructions = [];
+  for (const item of slot().personal_tactics?.instructions || []) {
+    if (chosen.has(item.code)) {
+      instructions.push({ code: item.code, value: chosen.get(item.code) });
+      chosen.delete(item.code);
+    }
+  }
+  for (const [code, value] of chosen) instructions.push({ code, value });
+  const tactics = {};
+  if (instructions.length) tactics.instructions = instructions;
+  for (const [field, selector] of [['attack_work_rate', '#attack-work-rate'], ['defense_work_rate', '#defense-work-rate']]) {
+    if ($(selector).value !== '') tactics[field] = Number($(selector).value);
+  }
+  return tactics;
+}
+function renderTeamTactics() {
+  const tactics = state.squad.team_tactics || {};
+  document.querySelectorAll('[data-team-tactic]').forEach((input) => { input.value = tactics[input.dataset.teamTactic] ?? ''; });
+}
+function teamTacticsIsDirty() {
+  const tactics = state.squad.team_tactics || {};
+  return Array.from(document.querySelectorAll('[data-team-tactic]')).some((input) => input.value !== String(tactics[input.dataset.teamTactic] ?? '') || input.validity.badInput);
+}
+function readTeamTactics() {
+  const tactics = {};
+  for (const input of document.querySelectorAll('[data-team-tactic]')) {
+    const value = input.type === 'number' ? readNumber(input, 100, '球队战术数值') : input.value.trim();
+    if (value !== null && value !== '') tactics[input.dataset.teamTactic] = value;
+  }
+  return tactics;
+}
+async function saveSquad(candidate, resetEditor = true) {
+  if (state.saving) throw new Error('正在保存阵容，请稍候。');
+  state.saving = true;
+  document.querySelectorAll('#editor input, #editor select, #editor button, #team-tactics input, #team-tactics button').forEach((element) => { element.disabled = true; });
+  try {
+    state.squad = await post('/api/squad', candidate);
+    renderPitch();
+    if (resetEditor) renderEditor();
+  } finally {
+    state.saving = false;
+    document.querySelectorAll('#editor input, #editor select, #editor button, #team-tactics input, #team-tactics button').forEach((element) => { element.disabled = false; });
+  }
+}
+function copySquad() { return JSON.parse(JSON.stringify(state.squad)); }
 async function saveEditor() {
-  const selected = slot();
+  const tactics = isSubstitute(slot()) ? {} : readPersonalTactics();
+  const candidate = copySquad();
+  const selected = allSlots(candidate).find((item) => item.key === state.selected);
   const newName = $('#slot-name').value.trim();
   const newSeason = $('#slot-season').value.trim();
   const linked = playerById(selected.player_id);
   if (linked && (newName !== selected.name || newSeason !== selected.season)) delete selected.player_id;
   Object.assign(selected, { position: $('#slot-position').value, name: newName, season: newSeason, level: $('#slot-level').value.trim() });
-  await saveSquad();
-  notify('球员信息已保存。');
+  if (Object.keys(tactics).length) selected.personal_tactics = tactics;
+  else delete selected.personal_tactics;
+  await saveSquad(candidate);
+  notify(isSubstitute(selected) ? '替补球员已保存。' : '球员和个人战术已保存。');
 }
 function renderPlayers() {
   const query = $('#search').value.trim().toLocaleLowerCase();
@@ -396,9 +632,10 @@ function renderPlayers() {
     row.querySelector('.season-icon-slot').replaceWith(seasonBadge(player.season));
     row.querySelector('.link-player').addEventListener('click', async () => {
       if (editorIsDirty() && !window.confirm('位置编辑有未保存的修改，关联后将丢失。继续吗？')) return;
-      const selected = slot();
+      const candidate = copySquad();
+      const selected = allSlots(candidate).find((item) => item.key === state.selected);
       Object.assign(selected, { player_id: player.id, name: player.name, season: player.season });
-      try { await saveSquad(); renderPlayers(); notify(`已关联到 ${selected.key}，请核对强化等级。`); } catch (error) { notify(error.message); }
+      try { await saveSquad(candidate); renderPlayers(); notify(`已关联到 ${selected.key}，请核对强化等级。`); } catch (error) { notify(error.message); }
     });
     row.querySelector('.refresh-player').addEventListener('click', () => importPlayer(player.source_url));
     list.append(row);
@@ -407,6 +644,7 @@ function renderPlayers() {
 async function reloadPlayers() {
   const result = await api('/api/players');
   state.players = result.players;
+  if (state.squad) renderPitch();
   renderPlayers();
   renderLinkedPlayer();
 }
@@ -447,7 +685,7 @@ async function searchOnlinePlayers(query) {
       results.append(row);
     }
   } catch (error) { status.textContent = error.message; }
-  finally { button.disabled = false; }
+  finally { results.scrollTop = 0; button.disabled = false; }
 }
 function renderRecognition(players) {
   const root = $('#recognition-results');
@@ -459,17 +697,19 @@ function renderRecognition(players) {
   for (const player of players) {
     const row = document.createElement('div');
     row.className = 'recognition-row';
-    row.innerHTML = `<div class="recognition-meta">识别位置：${escapeHtml(player.position || '未知')} <span>置信度：${escapeHtml(player.confidence || '未知')}</span></div><div class="recognition-fields"><input class="recognized-name" aria-label="球员名称" placeholder="球员名称" value="${escapeHtml(player.name)}"><input class="recognized-season" aria-label="赛季" placeholder="赛季" value="${escapeHtml(player.season)}"><input class="recognized-level" aria-label="强化" placeholder="强化" value="${escapeHtml(player.level)}"></div><div class="recognition-actions"><select aria-label="选择阵容位置"><option value="">选择要写入的位置</option>${state.squad.slots.map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.key)} · ${escapeHtml(item.name || '空位')}</option>`).join('')}</select><button class="button dark" type="button">确认写入</button></div>`;
+    row.innerHTML = `<div class="recognition-meta">识别位置：${escapeHtml(player.position || '未知')} <span>置信度：${escapeHtml(player.confidence || '未知')}</span></div><div class="recognition-fields"><input class="recognized-name" aria-label="球员名称" placeholder="球员名称" value="${escapeHtml(player.name)}"><input class="recognized-season" aria-label="赛季" placeholder="赛季" value="${escapeHtml(player.season)}"><input class="recognized-level" aria-label="强化" placeholder="强化" value="${escapeHtml(player.level)}"></div><div class="recognition-actions"><select aria-label="选择阵容位置"><option value="">选择要写入的位置</option>${allSlots().map((item) => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.key)} · ${escapeHtml(item.name || '空位')}</option>`).join('')}</select><button class="button dark" type="button">确认写入</button></div>`;
     row.querySelector('button').addEventListener('click', async () => {
       const key = row.querySelector('select').value;
       const name = row.querySelector('.recognized-name').value.trim();
       if (!key || !name) return notify('请选择位置并确认球员名称。');
-      const target = state.squad.slots.find((item) => item.key === key);
+      const target = allSlots().find((item) => item.key === key);
       if (editorIsDirty() && !window.confirm('位置编辑有未保存的修改，写入后将丢失。继续吗？')) return;
       if (target.name && !window.confirm(`将覆盖 ${key} 的 ${target.name}，继续吗？`)) return;
-      Object.assign(target, { name, season: row.querySelector('.recognized-season').value.trim(), level: row.querySelector('.recognized-level').value.trim() });
-      delete target.player_id;
-      try { await saveSquad(); selectSlot(key); row.querySelector('button').textContent = '已写入'; row.querySelector('button').disabled = true; notify('候选已写入，请关联对应的球员卡。'); } catch (error) { notify(error.message); }
+      const candidate = copySquad();
+      const updated = allSlots(candidate).find((item) => item.key === key);
+      Object.assign(updated, { name, season: row.querySelector('.recognized-season').value.trim(), level: row.querySelector('.recognized-level').value.trim() });
+      delete updated.player_id;
+      try { await saveSquad(candidate); selectSlot(key); row.querySelector('button').textContent = '已写入'; row.querySelector('button').disabled = true; notify('候选已写入，请关联对应的球员卡。'); } catch (error) { notify(error.message); }
     });
     root.append(row);
   }
@@ -513,42 +753,103 @@ function renderModel() {
   $('#model-mode').disabled = state.busy || state.recognizing;
   $('#model-status').textContent = !config ? '检查配置中' : config.chat ? (local ? '本地已配置 · 未验证' : '在线已配置 · 未验证') : '模型未配置';
   $('#model-status').classList.toggle('configured', Boolean(config?.chat));
-  $('#model-hint').textContent = local ? '连接本机 Ollama；如使用 Ollama 云模型，数据仍可能发送到远程。' : `使用 ${provider}：问题、阵容摘要和主动发送的截图会传给该服务，可能产生费用。` + (config && !config.vision ? ' 视觉模型未配置。' : ' 模型能力和余额需自行确认。');
-  $('#chat-privacy').textContent = local ? '问题、对话和阵容摘要将发送至本机 Ollama；使用云模型时可能传至远程。' : `问题、对话和阵容摘要将发送给 ${provider}。`;
+  $('#model-hint').textContent = local ? '连接本机 Ollama；如使用 Ollama 云模型，阵容和战术等数据仍可能发送到远程。' : `使用 ${provider}：问题、阵容和战术摘要及主动发送的截图会传给该服务，可能产生费用。` + (config && !config.vision ? ' 视觉模型未配置。' : ' 模型能力和余额需自行确认。');
+  $('#chat-privacy').textContent = local ? '问题、对话及已保存的阵容和战术将发送至本机 Ollama；使用云模型时可能传至远程。' : `问题、对话及已保存的阵容和战术将发送给 ${provider}。`;
   $('#vision-privacy').textContent = local ? '当前使用本机 Ollama。点击发送后才会传送截图；使用云模型时可能传至远程。识别结果需要逐项确认。' : `当前使用 ${provider}。点击发送后截图将传给该服务；识别结果需要逐项确认。`;
 }
 $('#model-mode').addEventListener('change', (event) => {
   state.mode = event.target.value;
   state.messages = [];
+  try {
+    localStorage.setItem(modelStorageKey, state.mode);
+    modelStorageAvailable = true;
+  } catch (error) {
+    modelStorageAvailable = false;
+  }
   renderModel();
-  notify('已切换模型，之前的对话不会作为上下文发送。');
+  notify(modelStorageAvailable ? '已切换模型，之前的对话不会作为上下文发送。' : '已切换模型，但浏览器存储不可用，刷新后可能恢复之前的选择。');
 });
 async function initialize() {
   try {
     state.squad = await api('/api/squad');
     await reloadPlayers();
-    renderPitch();
     renderEditor();
+    renderTeamTactics();
     state.config = await api('/api/config');
     renderModel();
   } catch (error) { notify(error.message); }
 }
+$('#slot-position').addEventListener('change', (event) => {
+  const select = event.currentTarget;
+  if (isSubstitute(slot())) {
+    select.dataset.previousPosition = select.value;
+    return;
+  }
+  if (Array.from(document.querySelectorAll('.instruction-value')).some((input) => input.value !== '') && !window.confirm('不同位置的个人战术选项可能不同。更改位置将清除当前已选择的个人战术，保存后才会生效；进攻和防守倾向保留。继续吗？')) {
+    select.value = select.dataset.previousPosition;
+    return;
+  }
+  select.dataset.previousPosition = select.value;
+  renderPersonalInstructions(select.value);
+});
 $('#save-slot').addEventListener('click', () => saveEditor().catch((error) => notify(error.message)));
 $('#clear-slot').addEventListener('click', async () => {
-  const selected = slot();
+  if (editorIsDirty() && !window.confirm(isSubstitute(slot()) ? '替补席位有未保存的修改，清空球员将丢弃这些修改。继续吗？' : '位置编辑有未保存的修改，清空球员将丢弃这些修改，已保存的个人战术会保留。继续吗？')) return;
+  const candidate = copySquad();
+  const selected = allSlots(candidate).find((item) => item.key === state.selected);
   Object.assign(selected, { name: '', season: '', level: '' });
+  if (isSubstitute(selected)) selected.position = '';
   delete selected.player_id;
-  try { await saveSquad(); notify('位置已清空。'); } catch (error) { notify(error.message); }
+  try { await saveSquad(candidate); notify(isSubstitute(selected) ? '替补球员已清空。' : '球员已清空，位置战术保留。'); } catch (error) { notify(error.message); }
+});
+$('#team-tactics-open').addEventListener('click', () => {
+  if (!state.squad) return notify('阵容尚未加载，请刷新页面后重试。');
+  if (state.saving) return notify('正在保存阵容，请稍候。');
+  $('#team-tactics-status').textContent = '';
+  $('#team-tactics').showModal();
+});
+function closeTeamTactics() {
+  if (state.saving) return;
+  if (teamTacticsIsDirty() && !window.confirm('球队战术有未保存的修改，关闭后将丢失。继续吗？')) return;
+  renderTeamTactics();
+  $('#team-tactics').close();
+}
+$('#team-tactics-close').addEventListener('click', closeTeamTactics);
+$('#team-tactics').addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeTeamTactics();
+});
+$('#save-team-tactics').addEventListener('click', async () => {
+  try {
+    const tactics = readTeamTactics();
+    const candidate = copySquad();
+    if (Object.keys(tactics).length) candidate.team_tactics = tactics;
+    else delete candidate.team_tactics;
+    await saveSquad(candidate, false);
+    renderTeamTactics();
+    $('#team-tactics-status').textContent = '球队战术已保存。';
+  } catch (error) { $('#team-tactics-status').textContent = error.message; }
+});
+$('#reset-team-tactics').addEventListener('click', () => {
+  if (teamTacticsIsDirty() && !window.confirm('撤销球队战术中未保存的修改？')) return;
+  renderTeamTactics();
+});
+window.addEventListener('beforeunload', (event) => {
+  if (state.squad && (state.saving || editorIsDirty() || teamTacticsIsDirty())) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
 });
 $('#online-search-form').addEventListener('submit', (event) => { event.preventDefault(); searchOnlinePlayers($('#online-search').value.trim()); });
 $('#player-form').addEventListener('submit', (event) => { event.preventDefault(); importPlayer($('#player-url').value); });
 $('#search').addEventListener('input', renderPlayers);
-const capture = { image: null, crop: null, start: null, generation: 0, stream: null };
+const capture = { image: null, crop: null, start: null, generation: 0, stream: null, loading: false };
 
 function resetCapture() {
   capture.generation += 1;
   if (capture.stream) capture.stream.getTracks().forEach((track) => track.stop());
   capture.stream = null;
+  capture.loading = false;
   capture.image = null;
   capture.crop = null;
   capture.start = null;
@@ -597,9 +898,25 @@ function selectedImage() {
   }
   throw new Error('截图过大，请重新选择较小的区域。');
 }
+function showCapture(image, name) {
+  capture.image = image;
+  capture.crop = null;
+  capture.start = null;
+  $('#image-input').value = '';
+  $('#image-name').textContent = name;
+  $('#recognition-results').replaceChildren();
+  const canvas = $('#capture-canvas');
+  const scale = Math.min(1, 1200 / image.width);
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  $('#capture-preview').hidden = false;
+  drawCapture();
+}
 async function captureScreen() {
   if (!navigator.mediaDevices?.getDisplayMedia) return notify('当前浏览器不支持桌面截图，请使用 Chrome 或 Edge 打开本地页面。');
   const generation = ++capture.generation;
+  if (capture.loading) $('#image-name').textContent = '';
+  capture.loading = false;
   const button = $('#capture-screen');
   let stream;
   button.disabled = true;
@@ -617,18 +934,7 @@ async function captureScreen() {
     image.width = video.videoWidth;
     image.height = video.videoHeight;
     image.getContext('2d').drawImage(video, 0, 0);
-    capture.image = image;
-    capture.crop = null;
-    capture.start = null;
-    $('#image-input').value = '';
-    $('#image-name').textContent = '已截取桌面画面';
-    $('#recognition-results').replaceChildren();
-    const canvas = $('#capture-canvas');
-    const scale = Math.min(1, 1200 / image.width);
-    canvas.width = Math.max(1, Math.round(image.width * scale));
-    canvas.height = Math.max(1, Math.round(image.height * scale));
-    $('#capture-preview').hidden = false;
-    drawCapture();
+    showCapture(image, '已截取桌面画面');
   } catch (error) {
     if (generation === capture.generation) notify(error.name === 'NotAllowedError' ? '已取消截图或未授予屏幕共享权限。' : (error.message || '截图失败，请尝试选择其他窗口。'));
   } finally {
@@ -646,6 +952,54 @@ $('#upload-dialog').addEventListener('close', () => {
   $('#recognition-results').replaceChildren();
 });
 $('#capture-screen').addEventListener('click', captureScreen);
+document.addEventListener('paste', (event) => {
+  const items = Array.from(event.clipboardData?.items || []);
+  const target = event.target;
+  const editable = target instanceof Element && (target.matches('input, textarea') || target.isContentEditable);
+  if (editable && items.some((item) => item.kind === 'string' && item.type === 'text/plain')) return;
+  const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
+  if (!imageItem || (document.querySelector('dialog[open]') && !$('#upload-dialog').open)) return;
+  event.preventDefault();
+  if (state.recognizing) return notify('截图识别进行中，请稍后粘贴。');
+  const file = imageItem.getAsFile();
+  if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return notify('仅支持粘贴 PNG、JPEG 或 WebP 截图。');
+  if (!file.size || file.size > 20 * 1024 * 1024) return notify('粘贴的截图为空或超过 20 MB。');
+  if (!$('#upload-dialog').open) $('#upload-dialog').showModal();
+  resetCapture();
+  const generation = capture.generation;
+  capture.loading = true;
+  $('#image-input').value = '';
+  $('#image-name').textContent = '正在读取粘贴的截图…';
+  $('#recognition-results').replaceChildren();
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (generation !== capture.generation || !$('#upload-dialog').open) return;
+    const image = new Image();
+    image.onload = () => {
+      if (generation !== capture.generation || !$('#upload-dialog').open) return;
+      capture.loading = false;
+      if (!image.width || !image.height || image.width * image.height > 40000000) {
+        $('#image-name').textContent = '';
+        return notify('截图尺寸无效或超过 4000 万像素，请缩小后重试。');
+      }
+      showCapture(image, '已粘贴截图，请预览后手动发送');
+    };
+    image.onerror = () => {
+      if (generation !== capture.generation) return;
+      capture.loading = false;
+      $('#image-name').textContent = '';
+      notify('粘贴的截图无法解码，请重试。');
+    };
+    image.src = reader.result;
+  };
+  reader.onerror = () => {
+    if (generation !== capture.generation) return;
+    capture.loading = false;
+    $('#image-name').textContent = '';
+    notify('无法读取粘贴的截图，请重试。');
+  };
+  reader.readAsDataURL(file);
+});
 $('#reset-crop').addEventListener('click', () => { capture.crop = null; drawCapture(); });
 $('#capture-canvas').addEventListener('pointerdown', (event) => {
   if (!capture.image) return;
@@ -676,8 +1030,9 @@ $('#image-input').addEventListener('change', () => {
   $('#recognition-results').replaceChildren();
 });
 $('#recognize').addEventListener('click', async () => {
+  if (capture.loading) return notify('截图正在读取，请稍候。');
   const file = $('#image-input').files[0];
-  if (!file && !capture.image) return notify('请先截取桌面或选择截图。');
+  if (!file && !capture.image) return notify('请先截取、粘贴或选择截图。');
   const button = $('#recognize');
   const generation = capture.generation;
   state.recognizing = true;
@@ -753,30 +1108,41 @@ for (const form of document.querySelectorAll('.key-form')) {
 }
 async function runSync(action) {
   if (!state.squad) return notify('阵容尚未加载，请刷新页面后重试。');
-  if (state.busy || state.recognizing) return notify('请等待对话或截图识别完成后再同步。');
-  if (editorIsDirty()) return notify('请先保存或撤销位置编辑中的修改，再进行同步。');
+  if (state.busy || state.recognizing || state.saving) return notify('请等待对话、截图识别或保存完成后再同步。');
+  if (editorIsDirty() || teamTacticsIsDirty()) return notify('请先保存或撤销位置及球队战术中的修改，再进行同步。');
   const importButton = $('#sync-import');
   const exportButton = $('#sync-export');
   importButton.disabled = true;
   exportButton.disabled = true;
   try {
     const info = await api('/api/sync');
+    let allowLegacyTactics = false;
+    let allowLegacySubstitutes = false;
     if (action === 'import') {
       if (!info.exists) throw new Error('没有同步文件，请先从 Git 拉取。');
       const warning = info.data_changed ? '本机阵容或球员可能有未导出的修改。' : '';
       if (!window.confirm(`${warning}导入将替换本机已保存的阵容和球员缓存，密钥不会改变。继续吗？`)) return;
+      if (info.legacy_tactics_conflict) {
+        allowLegacyTactics = window.confirm('旧版同步文件没有个人或球队战术。导入将清除本机已保存的战术，变为未设置。确认继续吗？');
+        if (!allowLegacyTactics) return;
+      }
+      if (info.legacy_substitutes_conflict) {
+        allowLegacySubstitutes = window.confirm('旧版同步文件没有替补席位。导入将清空本机已保存的替补球员，确认继续吗？');
+        if (!allowLegacySubstitutes) return;
+      }
     }
     let force = false;
     if (action === 'export' && info.file_changed) {
       force = window.confirm('同步文件有尚未导入的变更。导出将覆盖该文件，建议先导入或备份。仍要覆盖吗？');
       if (!force) return;
     }
-    await post(`/api/sync/${action}`, { file_hash: info.file_hash, data_hash: info.data_hash, force });
+    await post(`/api/sync/${action}`, { file_hash: info.file_hash, data_hash: info.data_hash, force, allow_legacy_tactics: allowLegacyTactics, allow_legacy_substitutes: allowLegacySubstitutes });
     if (action === 'import') {
       state.squad = await api('/api/squad');
       await reloadPlayers();
       renderPitch();
       renderEditor();
+      renderTeamTactics();
       state.messages = [];
       notify('同步数据已导入；对话上下文已清空。');
     } else notify('同步数据已导出，请检查文件后自行提交并推送。');
@@ -785,4 +1151,6 @@ async function runSync(action) {
 }
 $('#sync-import').addEventListener('click', () => runSync('import'));
 $('#sync-export').addEventListener('click', () => runSync('export'));
+renderModel();
+if (!modelStorageAvailable) notify('浏览器存储不可用，无法恢复上次的模型选择；当前默认使用 OpenAI。');
 initialize();

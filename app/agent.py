@@ -74,6 +74,29 @@ def configuration_status():
     return status
 
 
+def response_content(result):
+    try:
+        choice = result['choices'][0]
+        message = choice['message']
+        content = message.get('content')
+        reason = choice.get('finish_reason')
+    except (KeyError, IndexError, TypeError, AttributeError) as exc:
+        raise ValueError('模型响应格式不兼容，请检查所选模型及服务接口。') from exc
+    if isinstance(content, list):
+        content = ''.join(part['text'] for part in content if isinstance(part, dict) and part.get('type') in ('text', 'output_text') and isinstance(part.get('text'), str))
+    if isinstance(content, str) and content.strip():
+        return content
+    if message.get('refusal') or reason == 'content_filter':
+        raise ValueError('模型拒绝了该请求或内容被过滤，请调整问题或截图后重试。')
+    if reason == 'length':
+        raise ValueError('模型达到输出长度限制，未返回可用内容。请缩短问题或更换模型后重试。')
+    if message.get('tool_calls') or reason in ('tool_calls', 'function_call'):
+        raise ValueError('模型返回了工具调用而非文字；当前对话不支持模型自动调用工具。')
+    if message.get('reasoning_content'):
+        raise ValueError('模型仅返回推理内容，没有最终答复。请检查模型配置或更换模型后重试。')
+    raise ValueError('模型返回了空内容。请重试，并检查所选模型与服务接口是否兼容。')
+
+
 def complete(messages, vision=False, mode='local'):
     base, key, model = configured(vision, mode)
     payload = json.dumps({'model': model, 'messages': messages, 'temperature': 0.2, 'max_tokens': 1800}, ensure_ascii=False).encode('utf-8')
@@ -85,11 +108,18 @@ def complete(messages, vision=False, mode='local'):
     try:
         with urllib.request.build_opener(NoRedirect).open(request, timeout=600 if local else 90) as response:
             result = json.loads(response.read(2_000_000).decode('utf-8'))
-        content = result['choices'][0]['message']['content']
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError('empty')
-        return content
     except urllib.error.HTTPError as exc:
+        if mode == 'openai' and exc.code == 429:
+            try:
+                error = json.loads(exc.read(65536).decode('utf-8')).get('error', {})
+                code = error.get('code') if isinstance(error, dict) else None
+            except (AttributeError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+                code = None
+            if code == 'insufficient_quota':
+                raise ValueError('OpenAI 返回 HTTP 429：API 额度不足或已达到使用上限。请检查 API 计费、余额及项目用量限制；ChatGPT 订阅与 API 额度分开。') from exc
+            if code == 'rate_limit_exceeded':
+                raise ValueError('OpenAI 返回 HTTP 429：请求或令牌速率超限。请稍等片刻再试，或检查 API 项目的速率限制。') from exc
+            raise ValueError('OpenAI 返回 HTTP 429：可能是请求速率超限或 API 额度不足。请稍后重试，并检查 API 计费、余额及项目用量限制。') from exc
         if local and exc.code == 404:
             raise ValueError(f'本地模型未找到或接口地址不正确。请确认 Ollama 已启动，并运行 ollama pull {model} 下载模型。') from exc
         if local:
@@ -99,10 +129,9 @@ def complete(messages, vision=False, mode='local'):
         if local:
             raise ValueError('无法连接本地模型或等待超时。请确认 Ollama 已启动、模型已下载且电脑内存充足，然后重试。') from exc
         raise ValueError('模型请求失败，请检查网络、接口兼容性和配置。') from exc
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
-        raise ValueError('模型请求失败，请检查网络、接口兼容性和配置。') from exc
-    except ValueError as exc:
-        raise ValueError('模型没有返回可用内容。') from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError('模型响应格式不兼容，请检查所选模型及服务接口。') from exc
+    return response_content(result)
 
 
 def chat(summary, messages, mode='local'):
